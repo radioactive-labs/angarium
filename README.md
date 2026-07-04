@@ -79,13 +79,15 @@ ActiveJob per delivery. Each request is a JSON envelope:
 specification**, so receivers can verify them with the official
 [`standardwebhooks` libraries](https://github.com/standard-webhooks/standard-webhooks/tree/main/libraries)
 in any language (Ruby, Python, JavaScript, Go, Rust, PHP, Java, …) — no
-Angarium-specific code required.
+Angarium-specific code required. Compliance isn't just claimed: the test suite
+verifies every signed request against the official `standardwebhooks` Ruby
+library, so any drift from the spec fails CI.
 
 Every request carries three headers:
 
 | Header | Value |
 | --- | --- |
-| `webhook-id` | Unique, retry-stable message id (the delivery's id). |
+| `webhook-id` | Unique, retry-stable message id — the delivery's `id`, the **same value** as the envelope's `id`. It is unique per *delivery*, not per event, so the same event delivered to two endpoints has two different ids. |
 | `webhook-timestamp` | Unix seconds when the request was signed. |
 | `webhook-signature` | Space-delimited list of `v1,<base64 HMAC-SHA256>` tokens (one per active signing secret). |
 
@@ -268,16 +270,13 @@ There are several ways to send outbound webhooks from a Rails app. Angarium aims
 to be the maintained middle ground between rolling your own delivery system and
 adopting external webhook infrastructure.
 
-<!-- The Angarium column is verified against the current codebase. Other columns
-     summarize third-party projects and may drift as those projects change. -->
-
 | | Angarium | ActionHook | bullet_train-outgoing_webhooks | active_webhook | Svix / Hookdeck Outpost |
 |---|---|---|---|---|---|
 | Type | Mountable Rails engine | Ruby delivery library | Rails engine (Bullet Train) | Ruby library | Hosted / self-hosted service |
 | [Persisted endpoints & subscriptions](#setup) | ✅ per-endpoint event subscriptions | ❌ bring your own model | ✅ (tied to BT teams) | ✅ topics | ✅ |
 | [HMAC request signing](#verifying-signatures-receiver-side) | ✅ | ✅ (SHA256 fingerprint) | ✅ | ✅ | ✅ |
-| [Standard Webhooks](https://www.standardwebhooks.com) compliant | ✅ | ❌ | ❌ | ❌ | ✅ (Svix authored the spec) |
-| [Automatic retries with backoff](#retries) | ✅ jitter + `Retry-After` | ❌ single attempt helpers | ✅ | ✅ | ✅ |
+| [Standard Webhooks](https://www.standardwebhooks.com) compliant | ✅ | ❌ | ❌ | ❌ | ✅ (Svix initiated the spec) |
+| [Automatic retries with backoff](#retries) | ✅ jitter + `Retry-After` | ❌ (delegates to your job runner) | ✅ | ✅ | ✅ |
 | [Manual redelivery](#manual-redelivery) | ✅ | ❌ | — | — | ✅ |
 | [Auto-disable failing endpoints](#auto-disabling-failing-endpoints) | ✅ (opt-in) | ❌ | ❌ | ❌ | ✅ |
 | [SSRF protection](#security-ssrf-protection) | ✅ block + pin + fail-closed | ✅ private-IP blocking | ❌ | ❌ | ✅ |
@@ -287,6 +286,10 @@ adopting external webhook infrastructure.
 | Runs inside your app | ✅ | ✅ | ✅ | ✅ | ❌ separate service |
 | Framework requirements | Rails 7.1+ | Any Ruby | Bullet Train | Rails 5+ (dated) | Any (HTTP API) |
 | Actively maintained | ✅ | Low activity | ✅ | Last release 2021 | ✅ |
+
+<sub>The Angarium column is verified against this codebase. Other columns
+summarize third-party projects; `—` means not independently verified. Accurate
+as of July 2026 — corrections welcome via issue or PR.</sub>
 
 ### When to choose Angarium
 
@@ -321,9 +324,10 @@ The specifics receivers use to decide whether to trust a webhook sender:
   `{id}.{timestamp}.{body}`, with a 5-minute timestamp tolerance enforced on
   verification. Verify with the official `standardwebhooks` library in any
   language, or `Angarium::Signature.verify`.
-- **Stable IDs for deduplication.** `webhook-id` is the delivery's ID and is
-  identical across every retry of that delivery. Delivery is **at-least-once** —
-  dedupe on that ID and treat repeats as no-ops.
+- **Stable IDs for deduplication.** `webhook-id` is the delivery's ID (the same
+  value as the envelope's `id`) and is identical across every retry of that
+  delivery — but unique per *delivery*, not per event. Delivery is
+  **at-least-once** — dedupe on that ID and treat repeats as no-ops.
 - **Retries with backoff, jitter, and `Retry-After`.** Failures (non-2xx,
   timeouts, connection errors) retry on `config.retry_schedule` (default
   `1m, 5m, 30m, 2h, 5h`), with +0–15% jitter; a receiver's `Retry-After` header
