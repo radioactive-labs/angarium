@@ -48,4 +48,20 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     assert endpoint.subscribed_to?("user.created")
     refute endpoint.subscribed_to?("user.deleted")
   end
+
+  test "allows a private URL when the endpoint allowlists that range" do
+    endpoint = build(url: "https://10.1.2.5/hook", allowed_networks: ["10.1.2.0/24"])
+    assert endpoint.valid?, endpoint.errors.full_messages.to_sentence
+  end
+
+  test "allows a private URL when allow_private_network is set" do
+    endpoint = build(url: "https://10.1.2.5/hook", allow_private_network: true)
+    assert endpoint.valid?, endpoint.errors.full_messages.to_sentence
+  end
+
+  test "rejects invalid CIDR entries in allowed_networks" do
+    endpoint = build(allowed_networks: ["not-a-cidr"])
+    refute endpoint.valid?
+    assert_includes endpoint.errors[:allowed_networks].join, "invalid CIDR"
+  end
 end

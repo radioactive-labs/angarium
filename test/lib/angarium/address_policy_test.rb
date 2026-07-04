@@ -1,0 +1,43 @@
+require "test_helper"
+
+class Angarium::AddressPolicyTest < ActiveSupport::TestCase
+  Endpoint = Struct.new(:allow_private_network, :allowed_networks, keyword_init: true)
+
+  def endpoint(allow_private_network: false, allowed_networks: [])
+    Endpoint.new(allow_private_network:, allowed_networks:)
+  end
+
+  test "blocks private IPs by default" do
+    refute Angarium::AddressPolicy.ip_allowed?("127.0.0.1", endpoint)
+    refute Angarium::AddressPolicy.ip_allowed?("10.0.0.5", endpoint)
+    refute Angarium::AddressPolicy.ip_allowed?("169.254.169.254", endpoint)
+  end
+
+  test "allows public IPs by default" do
+    assert Angarium::AddressPolicy.ip_allowed?("93.184.216.34", endpoint)
+  end
+
+  test "allow_private_network bypasses the denylist" do
+    assert Angarium::AddressPolicy.ip_allowed?("10.0.0.5", endpoint(allow_private_network: true))
+    # ...and still allows public
+    assert Angarium::AddressPolicy.ip_allowed?("93.184.216.34", endpoint(allow_private_network: true))
+  end
+
+  test "allowlist is authoritative: only listed CIDRs allowed" do
+    ep = endpoint(allowed_networks: ["203.0.113.0/24"])
+    assert Angarium::AddressPolicy.ip_allowed?("203.0.113.10", ep)
+    refute Angarium::AddressPolicy.ip_allowed?("93.184.216.34", ep) # public but not listed
+  end
+
+  test "allowlist can intentionally permit a private range" do
+    ep = endpoint(allowed_networks: ["10.1.2.0/24"])
+    assert Angarium::AddressPolicy.ip_allowed?("10.1.2.5", ep)
+    refute Angarium::AddressPolicy.ip_allowed?("10.9.9.9", ep)
+  end
+
+  test "respects config.block_private_ips = false" do
+    Angarium.config.stub(:block_private_ips, false) do
+      assert Angarium::AddressPolicy.ip_allowed?("10.0.0.5", endpoint)
+    end
+  end
+end

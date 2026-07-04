@@ -3,6 +3,7 @@ require "angarium/engine"
 require "angarium/configuration"
 require "angarium/event_matcher"
 require "angarium/signature"
+require "angarium/address_policy"
 
 module Angarium
   class << self

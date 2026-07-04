@@ -7,6 +7,8 @@ class CreateAngariumEndpoints < ActiveRecord::Migration[7.1]
       t.boolean :active, null: false, default: true
       t.string :signing_secret, null: false
       t.json :subscribed_events, null: false, default: []
+      t.boolean :allow_private_network, null: false, default: false
+      t.json :allowed_networks, null: false, default: []
       t.timestamps
     end
   end
