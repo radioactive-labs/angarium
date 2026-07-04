@@ -49,9 +49,12 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     refute endpoint.subscribed_to?("user.deleted")
   end
 
-  test "allows a private URL when the endpoint allowlists that range" do
-    endpoint = build(url: "https://10.1.2.5/hook", allowed_networks: ["10.1.2.0/24"])
-    assert endpoint.valid?, endpoint.errors.full_messages.to_sentence
+  test "a private URL needs allow_private_network even if allowlisted" do
+    only_allowlist = build(url: "https://10.1.2.5/hook", allowed_networks: ["10.1.2.0/24"])
+    refute only_allowlist.valid?
+
+    with_flag = build(url: "https://10.1.2.5/hook", allow_private_network: true, allowed_networks: ["10.1.2.0/24"])
+    assert with_flag.valid?, with_flag.errors.full_messages.to_sentence
   end
 
   test "allows a private URL when allow_private_network is set" do

@@ -29,9 +29,15 @@ class Angarium::AddressPolicyTest < ActiveSupport::TestCase
     refute Angarium::AddressPolicy.ip_allowed?("93.184.216.34", ep) # public but not listed
   end
 
-  test "allowlist can intentionally permit a private range" do
+  test "allowlist alone does NOT permit a private range" do
     ep = endpoint(allowed_networks: ["10.1.2.0/24"])
+    refute Angarium::AddressPolicy.ip_allowed?("10.1.2.5", ep)
+  end
+
+  test "whitelisting a private range requires allow_private_network too" do
+    ep = endpoint(allow_private_network: true, allowed_networks: ["10.1.2.0/24"])
     assert Angarium::AddressPolicy.ip_allowed?("10.1.2.5", ep)
+    # private, allowed by the flag, but outside the allowlist -> still blocked
     refute Angarium::AddressPolicy.ip_allowed?("10.9.9.9", ep)
   end
 

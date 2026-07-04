@@ -11,17 +11,25 @@ module Angarium
     module_function
 
     # Is a single IP (String or IPAddr) permitted for this endpoint?
+    #
+    # Two independent gates, both must pass:
+    #   Gate A (private denylist): private/loopback/link-local addresses are
+    #     blocked unless endpoint.allow_private_network is set. An allowlist entry
+    #     does NOT by itself unlock a private address.
+    #   Gate B (allowlist): when endpoint.allowed_networks is non-empty, the
+    #     address must fall within one of those CIDRs.
     def ip_allowed?(ip, endpoint)
       ip = to_ipaddr(ip)
       return false unless ip
 
-      allowlist = Array(endpoint.allowed_networks).reject(&:blank?)
-      unless allowlist.empty?
-        return allowlist.any? { |cidr| cidr_include?(cidr, ip) }
+      if private?(ip) && Angarium.config.block_private_ips
+        return false unless endpoint.allow_private_network
       end
 
-      return true if endpoint.allow_private_network
-      return false if Angarium.config.block_private_ips && private?(ip)
+      allowlist = Array(endpoint.allowed_networks).reject(&:blank?)
+      unless allowlist.empty?
+        return false unless allowlist.any? { |cidr| cidr_include?(cidr, ip) }
+      end
 
       true
     end
