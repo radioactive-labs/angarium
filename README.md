@@ -276,9 +276,9 @@ adopting external webhook infrastructure.
 | [Persisted endpoints & subscriptions](#setup) | ✅ per-endpoint event subscriptions | ❌ bring your own model | ✅ (tied to BT teams) | ✅ topics | ✅ |
 | [HMAC request signing](#verifying-signatures-receiver-side) | ✅ | ✅ (SHA256 fingerprint) | ✅ | ✅ | ✅ |
 | [Standard Webhooks](https://www.standardwebhooks.com) compliant | ✅ | ❌ | ❌ | ❌ | ✅ (Svix initiated the spec) |
-| [Automatic retries with backoff](#retries) | ✅ jitter + `Retry-After` | ❌ (delegates to your job runner) | ✅ | ✅ | ✅ |
-| [Manual redelivery](#manual-redelivery) | ✅ | ❌ | — | — | ✅ |
-| [Auto-disable failing endpoints](#auto-disabling-failing-endpoints) | ✅ (opt-in) | ❌ | ❌ | ❌ | ✅ |
+| [Automatic retries with backoff](#retries) | ✅ jitter + `Retry-After` | ❌ (delegates to your job runner) | ✅ | ✅ (via queue adapter) | ✅ |
+| [Manual redelivery](#manual-redelivery) | ✅ | ❌ | ✅ `deliver(force:)` | ❌ | ✅ |
+| [Auto-disable failing endpoints](#auto-disabling-failing-endpoints) | ✅ (opt-in) | ❌ | ✅ (opt-in) | ❌ | ✅ |
 | [SSRF protection](#security-ssrf-protection) | ✅ block + pin + fail-closed | ✅ private-IP blocking | ❌ | ❌ | ✅ |
 | [Signing secrets encrypted at rest](#required-active-record-encryption) | ✅ Active Record Encryption | n/a (you store secrets) | ❌ | ❌ | ✅ |
 | [Zero-downtime secret rotation](#rotating-a-signing-secret-zero-downtime) | ✅ dual-signing grace window | ❌ | ❌ | ❌ | ✅ |
@@ -287,9 +287,10 @@ adopting external webhook infrastructure.
 | Framework requirements | Rails 7.1+ | Any Ruby | Bullet Train | Rails 5+ (dated) | Any (HTTP API) |
 | Actively maintained | ✅ | Low activity | ✅ | Last release 2021 | ✅ |
 
-<sub>The Angarium column is verified against this codebase. Other columns
-summarize third-party projects; `—` means not independently verified. Accurate
-as of July 2026 — corrections welcome via issue or PR.</sub>
+<sub>All columns verified by reading each project's source — actionhook 1.0.2,
+active_webhook 1.0.0, bullet_train-outgoing_webhooks 1.45.1 — as of July 2026;
+Svix / Hookdeck Outpost cells reflect their published docs. Corrections welcome
+via issue or PR.</sub>
 
 ### When to choose Angarium
 
