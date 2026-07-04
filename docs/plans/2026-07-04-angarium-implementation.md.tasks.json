@@ -1,0 +1,61 @@
+{
+  "planPath": "docs/plans/2026-07-04-angarium-implementation.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 0: Gem metadata, dependencies, and configuration",
+      "status": "completed",
+      "description": "Fill gemspec, add httpx/pg/webmock, add Angarium.configure config object. Suite green.\n\n```json:metadata\n{\"files\":[\"angarium.gemspec\",\"Gemfile\",\"lib/angarium.rb\",\"lib/angarium/configuration.rb\",\"test/test_helper.rb\",\"test/angarium/configuration_test.rb\"],\"verifyCommand\":\"bin/rails test test/angarium/configuration_test.rb\",\"requiresUserVerification\":false}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 1: Schema, base record, and models with associations",
+      "status": "pending",
+      "blockedBy": [0],
+      "description": "Four migrations + four models (+abstract base) with associations.\n\n```json:metadata\n{\"files\":[\"db/migrate/20260704000001_create_angarium_endpoints.rb\",\"db/migrate/20260704000002_create_angarium_events.rb\",\"db/migrate/20260704000003_create_angarium_deliveries.rb\",\"db/migrate/20260704000004_create_angarium_delivery_attempts.rb\",\"app/models/angarium/application_record.rb\",\"app/models/angarium/endpoint.rb\",\"app/models/angarium/event.rb\",\"app/models/angarium/delivery.rb\",\"app/models/angarium/delivery_attempt.rb\",\"test/dummy/app/models/owner.rb\",\"test/models/angarium/associations_test.rb\"],\"verifyCommand\":\"bin/rails test test/models/angarium/associations_test.rb\",\"requiresUserVerification\":false}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Endpoint behaviors — secret, URL/SSRF validation, subscription matching",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "Secret generation, https+SSRF URL validation, subscribed_to? matching.\n\n```json:metadata\n{\"files\":[\"lib/angarium/event_matcher.rb\",\"lib/angarium.rb\",\"app/validators/angarium/endpoint_url_validator.rb\",\"app/models/angarium/endpoint.rb\",\"test/lib/angarium/event_matcher_test.rb\",\"test/models/angarium/endpoint_test.rb\"],\"verifyCommand\":\"bin/rails test test/models/angarium/endpoint_test.rb test/lib/angarium/event_matcher_test.rb\",\"requiresUserVerification\":false}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Signature module (HMAC sign + verify)",
+      "status": "pending",
+      "blockedBy": [0],
+      "description": "HMAC sign + verify with replay tolerance.\n\n```json:metadata\n{\"files\":[\"lib/angarium/signature.rb\",\"lib/angarium.rb\",\"test/lib/angarium/signature_test.rb\"],\"verifyCommand\":\"bin/rails test test/lib/angarium/signature_test.rb\",\"requiresUserVerification\":false}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Dispatch API — fan event out to matching endpoints",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "Angarium.dispatch creates Event + Delivery per matching endpoint in a transaction.\n\n```json:metadata\n{\"files\":[\"lib/angarium/dispatch.rb\",\"lib/angarium.rb\",\"test/lib/angarium/dispatch_test.rb\"],\"verifyCommand\":\"bin/rails test test/lib/angarium/dispatch_test.rb\",\"requiresUserVerification\":false}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Deliver job — signed POST, attempt recording, success/fail transitions",
+      "status": "pending",
+      "blockedBy": [4, 3],
+      "description": "DeliverJob POSTs signed JSON envelope via HTTPX, records attempt, transitions succeeded/exhausted.\n\n```json:metadata\n{\"files\":[\"lib/angarium/client.rb\",\"lib/angarium.rb\",\"app/models/angarium/delivery.rb\",\"app/jobs/angarium/deliver_job.rb\",\"app/jobs/angarium/application_job.rb\",\"test/jobs/angarium/deliver_job_test.rb\"],\"verifyCommand\":\"bin/rails test test/jobs/angarium/deliver_job_test.rb\",\"requiresUserVerification\":false}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Retry with exponential backoff",
+      "status": "pending",
+      "blockedBy": [5],
+      "description": "Failed delivery reschedules via retry_schedule, sets next_attempt_at, exhausts when used up.\n\n```json:metadata\n{\"files\":[\"app/models/angarium/delivery.rb\",\"test/models/angarium/delivery_retry_test.rb\"],\"verifyCommand\":\"bin/rails test test/models/angarium/delivery_retry_test.rb\",\"requiresUserVerification\":false}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: Install generator, README, CHANGELOG",
+      "status": "pending",
+      "blockedBy": [6],
+      "description": "angarium:install generator writes initializer; README + CHANGELOG.\n\n```json:metadata\n{\"files\":[\"lib/generators/angarium/install/install_generator.rb\",\"lib/generators/angarium/install/templates/initializer.rb\",\"README.md\",\"CHANGELOG.md\",\"test/generators/angarium/install_generator_test.rb\"],\"verifyCommand\":\"bin/rails test test/generators/angarium/install_generator_test.rb\",\"requiresUserVerification\":false}\n```"
+    }
+  ],
+  "lastUpdated": "2026-07-04T00:00:00Z"
+}

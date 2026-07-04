@@ -158,11 +158,12 @@ end
   `TheDumbTechGuy`, MIT license, private `allowed_push_host`).
 - `Angarium::VERSION` starts at `0.1.0`.
 - **Runtime deps:** `rails (>= 7.1)`, `httpx`.
-- **Dev deps:** `test/dummy` app (Postgres, for `jsonb`), `minitest`, `webmock`.
+- **Dev deps:** `test/dummy` app (SQLite; `json` columns, Ruby-side subscription
+  matching), `minitest`, `webmock`.
 
 ## Testing strategy
 
-Minitest against a `test/dummy` Rails app (Postgres). WebMock stubs endpoint
+Minitest against a `test/dummy` Rails app (SQLite). WebMock stubs endpoint
 HTTP. Coverage of the public API and pipeline:
 - `dispatch` fan-out (event + N deliveries for matching endpoints only),
 - subscription matching (exact / prefix / catch-all / non-match),
@@ -175,9 +176,10 @@ HTTP. Coverage of the public API and pipeline:
 ## Scaffold status
 
 The mountable engine has already been generated at the target path with
-`isolate_namespace Angarium`, Postgres dummy app, Minitest, and skipped
-ActionCable/ActiveStorage/ActionMailer/JavaScript. Git initialized (not
-committed). Remaining work is captured in the implementation plan.
+`isolate_namespace Angarium`, Minitest, and skipped
+ActionCable/ActiveStorage/ActionMailer/JavaScript. The dummy app was
+reconfigured to use SQLite. Remaining work is captured in the implementation
+plan.
 
 ## Origin mapping (for reference)
 
