@@ -28,4 +28,14 @@ class Angarium::DeliveryAttemptTest < ActiveSupport::TestCase
     refute Angarium::DeliveryAttempt.exists?(old_two.id)
   end
 
+  test "prune accepts an absolute Time cutoff" do
+    old_one = attempt_at(10.days.ago)
+    recent  = attempt_at(1.hour.ago)
+
+    deleted = Angarium::DeliveryAttempt.prune(older_than: 2.days.ago)
+
+    assert_equal 1, deleted
+    assert_equal [recent.id], Angarium::DeliveryAttempt.pluck(:id)
+    refute Angarium::DeliveryAttempt.exists?(old_one.id)
+  end
 end
