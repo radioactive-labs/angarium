@@ -2,6 +2,7 @@ require "angarium/version"
 require "angarium/engine"
 require "angarium/configuration"
 require "angarium/event_matcher"
+require "angarium/signature"
 
 module Angarium
   class << self
