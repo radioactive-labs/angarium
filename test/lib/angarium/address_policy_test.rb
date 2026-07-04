@@ -1,4 +1,5 @@
 require "test_helper"
+require "ipaddr"
 
 class Angarium::AddressPolicyTest < ActiveSupport::TestCase
   Endpoint = Struct.new(:allow_private_network, :allowed_networks, keyword_init: true)
@@ -63,5 +64,17 @@ class Angarium::AddressPolicyTest < ActiveSupport::TestCase
     refute Angarium::AddressPolicy.host_permitted_for_validation?("127.0.0.1", endpoint)
     # unresolvable host -> [] -> all? -> true (lenient at validation; re-checked at delivery)
     assert Angarium::AddressPolicy.host_permitted_for_validation?("does-not-exist.invalid", endpoint)
+  end
+
+  test "host_permitted_for_validation? rejects when ANY resolved IP is disallowed" do
+    Angarium::AddressPolicy.stub(:resolve, [IPAddr.new("93.184.216.34"), IPAddr.new("10.0.0.1")]) do
+      refute Angarium::AddressPolicy.host_permitted_for_validation?("multi.example", endpoint)
+    end
+  end
+
+  test "host_permitted_for_validation? allows when ALL resolved IPs are allowed" do
+    Angarium::AddressPolicy.stub(:resolve, [IPAddr.new("93.184.216.34"), IPAddr.new("8.8.8.8")]) do
+      assert Angarium::AddressPolicy.host_permitted_for_validation?("multi.example", endpoint)
+    end
   end
 end

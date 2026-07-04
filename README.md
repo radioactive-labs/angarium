@@ -80,6 +80,14 @@ Failed deliveries (non-2xx or connection errors) are retried on the schedule in
 attempt is recorded as an `Angarium::DeliveryAttempt`. After the schedule is
 exhausted the delivery is marked `exhausted`.
 
+### At-least-once delivery
+
+Delivery is **at-least-once**: a webhook may arrive more than once — a retry
+after a receiver processed the request but the response was lost, or a rare
+duplicate job enqueue. **Make your receivers idempotent**: dedupe on the
+envelope's `id` (stable across every attempt of the same delivery) and treat a
+repeat as a no-op.
+
 ## Security (SSRF protection)
 
 Because endpoint URLs are user-supplied, Angarium guards against Server-Side
