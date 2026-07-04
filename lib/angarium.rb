@@ -4,6 +4,7 @@ require "angarium/configuration"
 require "angarium/event_matcher"
 require "angarium/signature"
 require "angarium/address_policy"
+require "angarium/dispatch"
 
 module Angarium
   class << self
@@ -13,6 +14,10 @@ module Angarium
 
     def configure
       yield config
+    end
+
+    def dispatch(event_name, payload, owner:)
+      Dispatch.call(event_name, payload, owner: owner)
     end
   end
 end
