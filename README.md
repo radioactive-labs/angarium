@@ -274,15 +274,15 @@ adopting external webhook infrastructure.
 | | Angarium | ActionHook | bullet_train-outgoing_webhooks | active_webhook | Svix / Hookdeck Outpost |
 |---|---|---|---|---|---|
 | Type | Mountable Rails engine | Ruby delivery library | Rails engine (Bullet Train) | Ruby library | Hosted / self-hosted service |
-| Persisted endpoints & subscriptions | ✅ per-endpoint event subscriptions | ❌ bring your own model | ✅ (tied to BT teams) | ✅ topics | ✅ |
-| HMAC request signing | ✅ | ✅ (SHA256 fingerprint) | ✅ | ✅ | ✅ |
+| [Persisted endpoints & subscriptions](#setup) | ✅ per-endpoint event subscriptions | ❌ bring your own model | ✅ (tied to BT teams) | ✅ topics | ✅ |
+| [HMAC request signing](#verifying-signatures-receiver-side) | ✅ | ✅ (SHA256 fingerprint) | ✅ | ✅ | ✅ |
 | [Standard Webhooks](https://www.standardwebhooks.com) compliant | ✅ | ❌ | ❌ | ❌ | ✅ (Svix authored the spec) |
-| Automatic retries with backoff | ✅ jitter + `Retry-After` | ❌ single attempt helpers | ✅ | ✅ | ✅ |
-| Manual redelivery | ✅ | ❌ | — | — | ✅ |
-| Auto-disable failing endpoints | ✅ (opt-in) | ❌ | ❌ | ❌ | ✅ |
-| SSRF protection | ✅ block + pin + fail-closed | ✅ private-IP blocking | ❌ | ❌ | ✅ |
-| Signing secrets encrypted at rest | ✅ Active Record Encryption | n/a (you store secrets) | ❌ | ❌ | ✅ |
-| Zero-downtime secret rotation | ✅ dual-signing grace window | ❌ | ❌ | ❌ | ✅ |
+| [Automatic retries with backoff](#retries) | ✅ jitter + `Retry-After` | ❌ single attempt helpers | ✅ | ✅ | ✅ |
+| [Manual redelivery](#manual-redelivery) | ✅ | ❌ | — | — | ✅ |
+| [Auto-disable failing endpoints](#auto-disabling-failing-endpoints) | ✅ (opt-in) | ❌ | ❌ | ❌ | ✅ |
+| [SSRF protection](#security-ssrf-protection) | ✅ block + pin + fail-closed | ✅ private-IP blocking | ❌ | ❌ | ✅ |
+| [Signing secrets encrypted at rest](#required-active-record-encryption) | ✅ Active Record Encryption | n/a (you store secrets) | ❌ | ❌ | ✅ |
+| [Zero-downtime secret rotation](#rotating-a-signing-secret-zero-downtime) | ✅ dual-signing grace window | ❌ | ❌ | ❌ | ✅ |
 | Job backend | Any ActiveJob backend | n/a | ActiveJob | Multiple adapters | Own workers |
 | Runs inside your app | ✅ | ✅ | ✅ | ✅ | ❌ separate service |
 | Framework requirements | Rails 7.1+ | Any Ruby | Bullet Train | Rails 5+ (dated) | Any (HTTP API) |
