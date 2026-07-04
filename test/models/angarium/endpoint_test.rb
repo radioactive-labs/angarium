@@ -1,4 +1,5 @@
 require "test_helper"
+require "ipaddr"
 
 class Angarium::EndpointTest < ActiveSupport::TestCase
   setup { @owner = Owner.create!(name: "Acme") }
@@ -61,6 +62,36 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     assert endpoint.subscribed_to?("invoice.paid")
     assert endpoint.subscribed_to?("user.created")
     refute endpoint.subscribed_to?("user.deleted")
+  end
+
+  test "updating an unrelated attribute does not re-run the address check" do
+    endpoint = build(url: "https://93.184.216.34/hook").tap(&:save!)
+    # Even if the host would now resolve to a disallowed address, an unrelated
+    # update (url/allowlist/allow_private unchanged) must not re-validate it.
+    Angarium::AddressPolicy.stub(:resolve, [IPAddr.new("10.0.0.1")]) do
+      assert endpoint.update(active: false), endpoint.errors.full_messages.to_sentence
+    end
+  end
+
+  test "changing the url re-runs the address check" do
+    endpoint = build(url: "https://93.184.216.34/hook").tap(&:save!)
+    endpoint.url = "https://10.0.0.1/hook"
+    refute endpoint.valid?
+    assert_includes endpoint.errors[:url].join, "disallowed"
+  end
+
+  test "turning off allow_private_network re-validates the url" do
+    endpoint = build(url: "https://10.1.2.5/hook", allow_private_network: true).tap(&:save!)
+    endpoint.allow_private_network = false
+    refute endpoint.valid?
+    assert_includes endpoint.errors[:url].join, "disallowed"
+  end
+
+  test "tightening allowed_networks re-validates the url" do
+    endpoint = build(url: "https://93.184.216.34/hook").tap(&:save!)
+    endpoint.allowed_networks = ["10.0.0.0/8"] # public IP no longer within the allowlist
+    refute endpoint.valid?
+    assert_includes endpoint.errors[:url].join, "disallowed"
   end
 
   test "regenerate_signing_secret! rotates and persists a new secret" do

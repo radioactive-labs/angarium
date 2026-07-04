@@ -22,7 +22,8 @@ module Angarium
     before_validation :ensure_signing_secret, on: :create
 
     validates :name, presence: true
-    validates :url, presence: true, "angarium/endpoint_url": true
+    validates :url, presence: true
+    validates :url, "angarium/endpoint_url": true, if: :verify_url_address?
     validates :active, inclusion: { in: [true, false] }
     validate :allowed_networks_are_valid_cidrs
 
@@ -47,6 +48,21 @@ module Angarium
 
     def ensure_signing_secret
       self.signing_secret ||= self.class.generate_signing_secret
+    end
+
+    # Re-run the URL + SSRF address check only when something that affects the
+    # decision changes: the URL itself, or the SSRF controls (allow_private_network,
+    # allowed_networks). This avoids a DNS lookup on unrelated updates (e.g.
+    # toggling `active`), while still catching a URL that a tightened policy now
+    # disallows. (Reassign allowed_networks to a new array to trigger dirty
+    # tracking; in-place mutation isn't detected.)
+    def verify_url_address?
+      return false if url.blank?
+
+      new_record? ||
+        will_save_change_to_url? ||
+        will_save_change_to_allow_private_network? ||
+        will_save_change_to_allowed_networks?
     end
 
     def allowed_networks_are_valid_cidrs

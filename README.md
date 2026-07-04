@@ -115,8 +115,9 @@ repeat as a no-op.
 ## Security (SSRF protection)
 
 Because endpoint URLs are user-supplied, Angarium guards against Server-Side
-Request Forgery. Three controls, checked at endpoint-save time and re-checked at
-delivery time:
+Request Forgery. Three controls, validated when an endpoint is created or when
+its `url`, `allow_private_network`, or `allowed_networks` change, and re-checked
+at delivery time:
 
 - **`config.block_private_ips`** (default `true`) — blocks delivery to
   private, loopback, and link-local addresses (e.g. `127.0.0.1`, `10.0.0.0/8`,

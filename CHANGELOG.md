@@ -15,6 +15,8 @@
 - Endpoint `signing_secret` is encrypted at rest with Active Record Encryption
   (requires the host app to configure encryption keys).
 - `Endpoint#regenerate_signing_secret!` to rotate an endpoint's signing secret.
+- Endpoint URL/SSRF validation re-runs when `url`, `allow_private_network`, or
+  `allowed_networks` change (and skips the DNS lookup on unrelated updates).
 - Configurable `config.primary_key_type` for Angarium's own tables (defaults
   to the host app's generator setting, or bigint); polymorphic `owner_id` is
   now a string column so owners with any primary key type (bigint, UUID, or a
