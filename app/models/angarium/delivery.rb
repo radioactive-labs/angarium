@@ -49,9 +49,16 @@ module Angarium
       update!(state: "succeeded", next_attempt_at: nil)
     end
 
-    # Retry scheduling is added in Task 6; base behavior here = exhaust.
     def handle_failure!
-      update!(state: "exhausted")
+      schedule = Array(Angarium.config.retry_schedule)
+      wait = schedule[attempt_count - 1] # attempt_count already incremented for this attempt
+
+      if wait
+        update!(state: "pending", next_attempt_at: Time.current + wait)
+        DeliverJob.set(wait: wait).perform_later(id)
+      else
+        update!(state: "exhausted")
+      end
     end
 
     def destination_host
