@@ -38,28 +38,28 @@
     {
       "id": 4,
       "subject": "Task 4: Dispatch API — fan event out to matching endpoints",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [2],
       "description": "Angarium.dispatch creates Event + Delivery per matching endpoint in a transaction.\n\n```json:metadata\n{\"files\":[\"lib/angarium/dispatch.rb\",\"lib/angarium.rb\",\"test/lib/angarium/dispatch_test.rb\"],\"verifyCommand\":\"bin/rails test test/lib/angarium/dispatch_test.rb\",\"requiresUserVerification\":false}\n```"
     },
     {
       "id": 5,
       "subject": "Task 5: Deliver job — signed POST, attempt recording, success/fail transitions",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [4, 3],
       "description": "DeliverJob POSTs signed JSON envelope via HTTPX, records attempt, transitions succeeded/exhausted.\n\n```json:metadata\n{\"files\":[\"lib/angarium/client.rb\",\"lib/angarium.rb\",\"app/models/angarium/delivery.rb\",\"app/jobs/angarium/deliver_job.rb\",\"app/jobs/angarium/application_job.rb\",\"test/jobs/angarium/deliver_job_test.rb\"],\"verifyCommand\":\"bin/rails test test/jobs/angarium/deliver_job_test.rb\",\"requiresUserVerification\":false}\n```"
     },
     {
       "id": 6,
       "subject": "Task 6: Retry with exponential backoff",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [5],
       "description": "Failed delivery reschedules via retry_schedule, sets next_attempt_at, exhausts when used up.\n\n```json:metadata\n{\"files\":[\"app/models/angarium/delivery.rb\",\"test/models/angarium/delivery_retry_test.rb\"],\"verifyCommand\":\"bin/rails test test/models/angarium/delivery_retry_test.rb\",\"requiresUserVerification\":false}\n```"
     },
     {
       "id": 7,
       "subject": "Task 7: Install generator, README, CHANGELOG",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [6],
       "description": "angarium:install generator writes initializer; README + CHANGELOG.\n\n```json:metadata\n{\"files\":[\"lib/generators/angarium/install/install_generator.rb\",\"lib/generators/angarium/install/templates/initializer.rb\",\"README.md\",\"CHANGELOG.md\",\"test/generators/angarium/install_generator_test.rb\"],\"verifyCommand\":\"bin/rails test test/generators/angarium/install_generator_test.rb\",\"requiresUserVerification\":false}\n```"
     }
