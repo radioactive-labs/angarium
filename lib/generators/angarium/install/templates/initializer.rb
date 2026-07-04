@@ -20,4 +20,7 @@ Angarium.configure do |config|
   # Reject endpoint URLs that resolve to private/loopback addresses (SSRF guard).
   # Per-endpoint overrides: endpoint.allow_private_network and endpoint.allowed_networks.
   # config.block_private_ips = true
+
+  # Primary key type for Angarium's own tables.
+  # config.primary_key_type = nil # nil = use the app's default (bigint unless overridden); set :uuid etc. to force
 end

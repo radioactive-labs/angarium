@@ -10,12 +10,12 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_04_000100) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_04_000101) do
   create_table "angarium_deliveries", force: :cascade do |t|
     t.integer "attempt_count", default: 0, null: false
     t.datetime "created_at", null: false
-    t.integer "endpoint_id", null: false
-    t.integer "event_id", null: false
+    t.bigint "endpoint_id", null: false
+    t.bigint "event_id", null: false
     t.datetime "last_attempt_at"
     t.datetime "next_attempt_at"
     t.string "state", default: "pending", null: false
@@ -26,7 +26,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_000100) do
 
   create_table "angarium_delivery_attempts", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.integer "delivery_id", null: false
+    t.bigint "delivery_id", null: false
     t.float "duration"
     t.string "error"
     t.text "response_body"
@@ -41,7 +41,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_000100) do
     t.json "allowed_networks", default: [], null: false
     t.datetime "created_at", null: false
     t.string "name", null: false
-    t.integer "owner_id", null: false
+    t.string "owner_id", null: false
     t.string "owner_type", null: false
     t.text "signing_secret", null: false
     t.json "subscribed_events", default: [], null: false
@@ -58,6 +58,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_000100) do
   end
 
   create_table "owners", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name"
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "uuid_owners", id: :string, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name"
     t.datetime "updated_at", null: false

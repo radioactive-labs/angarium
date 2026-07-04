@@ -1,7 +1,8 @@
 module Angarium
   class Configuration
     attr_accessor :job_queue, :http_timeout, :open_timeout, :user_agent,
-                  :retry_schedule, :signature_header, :block_private_ips
+                  :retry_schedule, :signature_header, :block_private_ips,
+                  :primary_key_type
 
     def initialize
       @job_queue        = :default
@@ -11,6 +12,7 @@ module Angarium
       @retry_schedule   = [1.minute, 5.minutes, 30.minutes, 2.hours, 5.hours]
       @signature_header = "X-Angarium-Signature"
       @block_private_ips = true
+      @primary_key_type = nil
     end
   end
 end

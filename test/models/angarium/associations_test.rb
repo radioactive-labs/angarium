@@ -27,4 +27,19 @@ class Angarium::AssociationsTest < ActiveSupport::TestCase
     @endpoint.update!(active: false)
     assert_empty Angarium::Endpoint.active
   end
+
+  test "supports a string/uuid-keyed owner alongside an integer-keyed owner" do
+    int_owner = Owner.create!(name: "IntCo")
+    uuid_owner = UuidOwner.create!(name: "UuidCo")
+
+    int_ep = Angarium::Endpoint.create!(owner: int_owner, name: "a", url: "https://example.test/hook", subscribed_events: ["*"])
+    uuid_ep = Angarium::Endpoint.create!(owner: uuid_owner, name: "b", url: "https://example.test/hook", subscribed_events: ["*"])
+
+    assert_equal int_ep, int_owner.webhook_endpoints.sole
+    assert_equal uuid_ep, uuid_owner.webhook_endpoints.sole
+    assert_equal int_owner, int_ep.reload.owner
+    assert_equal uuid_owner, uuid_ep.reload.owner
+    # owner_id is stored as a string in both cases
+    assert_kind_of String, uuid_ep.owner_id
+  end
 end

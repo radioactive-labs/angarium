@@ -146,7 +146,22 @@ not follow redirects, so redirect-based bypasses are already closed.
 
 Run `bin/rails g angarium:install` to generate `config/initializers/angarium.rb`
 with all options: `job_queue`, `http_timeout`, `open_timeout`, `user_agent`,
-`retry_schedule`, `signature_header`, and `block_private_ips`.
+`retry_schedule`, `signature_header`, `block_private_ips`, and `primary_key_type`.
+
+### Primary keys
+
+Angarium's own tables (`angarium_endpoints`, `angarium_events`,
+`angarium_deliveries`, `angarium_delivery_attempts`) follow
+`config.primary_key_type`: leave it `nil` (the default) to inherit your app's
+own default (its `config.generators.active_record.primary_key_type`, or
+bigint if that's unset), or set it explicitly (e.g. `:uuid`) to force a type
+regardless of the app's default.
+
+`owner_id` on `angarium_endpoints` is always a string column, since a
+polymorphic owner can point at models with different primary key types (an
+integer-keyed `User` and a UUID-keyed `Account` in the same app). This works
+transparently with any owner primary key — integer, UUID, or a mix — without
+any configuration.
 
 ## License
 
