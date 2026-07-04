@@ -41,7 +41,10 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
   end
 
   test "a custom header cannot override the webhook-signature header" do
-    @endpoint.update!(custom_headers: { "webhook-signature" => "evil" })
+    # The denylist rejects a webhook-signature custom header at validation, so
+    # bypass it here to prove the delivery-time defense (signature always wins)
+    # still holds even if such a header reached the row some other way.
+    @endpoint.update_columns(custom_headers: { "webhook-signature" => "evil" })
     fake = succeeding_client
     delivery = create_delivery
     delivery.deliver!(client: fake)

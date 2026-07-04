@@ -2,10 +2,11 @@
 
 Outbound webhooks for Rails: signed, retried, subscription-based delivery.
 
-Angarium is a mountable Rails engine that delivers outbound webhooks with HMAC
+Angarium is a Rails engine that delivers outbound webhooks with HMAC
 request signing, automatic retries with exponential backoff, per-endpoint event
 subscriptions, and SSRF protection. It works with any ActiveJob backend and any
-Rails 7.1+ app.
+Rails 7.1+ app. It's headless in v1 — no routes or UI, just models and jobs —
+but namespaced via `isolate_namespace`, so a UI can be mounted on top later.
 
 ## Installation
 
@@ -79,9 +80,9 @@ ActiveJob per delivery. Each request is a JSON envelope:
 specification**, so receivers can verify them with the official
 [`standardwebhooks` libraries](https://github.com/standard-webhooks/standard-webhooks/tree/main/libraries)
 in any language (Ruby, Python, JavaScript, Go, Rust, PHP, Java, …) — no
-Angarium-specific code required. Compliance isn't just claimed: the test suite
-verifies every signed request against the official `standardwebhooks` Ruby
-library, so any drift from the spec fails CI.
+Angarium-specific code required. Conformance is enforced in CI: signed requests
+are verified with the official `standardwebhooks` Ruby library, so any drift from
+the spec fails the build.
 
 Every request carries three headers:
 
@@ -143,7 +144,10 @@ endpoint.update!(custom_headers: { "Authorization" => "Bearer abc123" })
 
 `custom_headers` must be a hash of string keys and values. The `webhook-id`,
 `webhook-timestamp`, and `webhook-signature` headers always win, so a custom
-header can never override or spoof them.
+header can never override or spoof them. In the same spirit, reserved and
+transport headers (`webhook-id`, `webhook-timestamp`, `webhook-signature`,
+`host`, `content-length`, `content-type`, `transfer-encoding`, `connection`)
+are rejected at validation (case-insensitively) and can't be overridden.
 
 ## Retries
 
@@ -207,6 +211,25 @@ duplicate job enqueue. **Make your receivers idempotent**: dedupe on the
 envelope's `id` (stable across every attempt of the same delivery) and treat a
 repeat as a no-op.
 
+## Data retention
+
+Every delivery attempt stores the receiver's response body (capped at
+`config.max_response_body_bytes`, 64KB by default), so `angarium_delivery_attempts`
+grows with delivery volume × retries — a busy app talking to a flapping receiver
+can accumulate rows quickly. You have three options to keep it bounded:
+
+```ruby
+# 1. Set a retention window and prune on a schedule (cron / your scheduler):
+Angarium.config.delivery_attempt_retention = 90.days
+#    then run periodically:  bin/rails angarium:prune
+
+# 2. Or prune inline, wherever you like:
+Angarium::DeliveryAttempt.prune(older_than: 90.days)
+
+# 3. Or store less per attempt by lowering the response-body cap:
+Angarium.config.max_response_body_bytes = 4_096
+```
+
 ## Security (SSRF protection)
 
 Because endpoint URLs are user-supplied, Angarium guards against Server-Side
@@ -247,7 +270,8 @@ Run `bin/rails g angarium:install` to generate `config/initializers/angarium.rb`
 with all options: `job_queue`, `http_timeout`, `open_timeout`, `user_agent`,
 `retry_schedule`, `block_private_ips`, `primary_key_type`,
 `max_response_body_bytes`, `auto_disable_endpoint_after`, `respect_retry_after`,
-`max_retry_after`, `retry_jitter`, and `signing_secret_grace_period`.
+`max_retry_after`, `retry_jitter`, `signing_secret_grace_period`, and
+`delivery_attempt_retention`.
 
 ### Primary keys
 
@@ -272,7 +296,7 @@ adopting external webhook infrastructure.
 
 | | Angarium | ActionHook | bullet_train-outgoing_webhooks | active_webhook | Svix / Hookdeck Outpost |
 |---|---|---|---|---|---|
-| Type | Mountable Rails engine | Ruby delivery library | Rails engine (Bullet Train) | Ruby library | Hosted / self-hosted service |
+| Type | Rails engine (headless) | Ruby delivery library | Rails engine (Bullet Train) | Ruby library | Hosted / self-hosted service |
 | [Persisted endpoints & subscriptions](#setup) | ✅ per-endpoint event subscriptions | ❌ bring your own model | ✅ (tied to BT teams) | ✅ topics | ✅ |
 | [HMAC request signing](#verifying-signatures-receiver-side) | ✅ | ✅ (SHA256 fingerprint) | ✅ | ✅ | ✅ |
 | [Standard Webhooks](https://www.standardwebhooks.com) compliant | ✅ | ❌ | ❌ | ❌ | ✅ (Svix initiated the spec) |

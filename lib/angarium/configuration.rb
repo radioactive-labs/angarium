@@ -4,7 +4,8 @@ module Angarium
                   :retry_schedule, :block_private_ips,
                   :primary_key_type, :max_response_body_bytes,
                   :auto_disable_endpoint_after, :respect_retry_after,
-                  :max_retry_after, :retry_jitter, :signing_secret_grace_period
+                  :max_retry_after, :retry_jitter, :signing_secret_grace_period,
+                  :delivery_attempt_retention
 
     def initialize
       @job_queue        = :default
@@ -20,6 +21,7 @@ module Angarium
       @max_retry_after             = 3600
       @retry_jitter                = 0.15
       @signing_secret_grace_period = 24.hours
+      @delivery_attempt_retention  = nil
     end
   end
 end

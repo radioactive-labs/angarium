@@ -3,6 +3,14 @@ require "base64"
 
 module Angarium
   class Endpoint < ApplicationRecord
+    # Headers a user-supplied custom header may never set: the Standard Webhooks
+    # signature headers (which must not be spoofable) and transport/hop-by-hop
+    # headers whose override invites request smuggling or receiver confusion.
+    RESERVED_HEADERS = %w[
+      webhook-id webhook-timestamp webhook-signature
+      host content-length content-type transfer-encoding connection
+    ].freeze
+
     belongs_to :owner, polymorphic: true
     has_many :deliveries, class_name: "Angarium::Delivery", dependent: :destroy
 
@@ -122,6 +130,11 @@ module Angarium
       unless custom_headers.is_a?(Hash) &&
           custom_headers.all? { |k, v| k.is_a?(String) && v.is_a?(String) }
         errors.add(:custom_headers, "must be a hash of string keys and values")
+        return
+      end
+
+      if custom_headers.keys.any? { |k| RESERVED_HEADERS.include?(k.downcase) }
+        errors.add(:custom_headers, "cannot override reserved or transport headers (#{RESERVED_HEADERS.join(", ")})")
       end
     end
   end

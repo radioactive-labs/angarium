@@ -47,3 +47,10 @@
   signed with both the new and previous secret for
   `config.signing_secret_grace_period`, and `Signature.verify` accepts any
   signature in the header, enabling zero-downtime secret rollover.
+- Custom-header reserved/transport denylist: `custom_headers` can no longer set
+  the Standard Webhooks signature headers or dangerous transport headers
+  (`host`, `content-length`, `content-type`, `transfer-encoding`, `connection`),
+  rejected case-insensitively at validation.
+- Delivery-attempt retention: `config.delivery_attempt_retention`,
+  `Angarium::DeliveryAttempt.prune(older_than:)`, and a `bin/rails angarium:prune`
+  rake task to keep `angarium_delivery_attempts` bounded.

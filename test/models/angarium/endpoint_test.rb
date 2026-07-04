@@ -142,6 +142,28 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     assert_includes endpoint.errors[:custom_headers].join, "hash of string keys and values"
   end
 
+  test "rejects custom_headers that override a transport header" do
+    endpoint = build(custom_headers: { "Content-Type" => "text/plain" })
+    refute endpoint.valid?
+    assert_includes endpoint.errors[:custom_headers].join, "reserved or transport headers"
+  end
+
+  test "rejects custom_headers that override a signature header" do
+    endpoint = build(custom_headers: { "webhook-signature" => "x" })
+    refute endpoint.valid?
+    assert_includes endpoint.errors[:custom_headers].join, "reserved or transport headers"
+  end
+
+  test "reserved custom_headers denylist is case-insensitive" do
+    endpoint = build(custom_headers: { "HOST" => "evil" })
+    refute endpoint.valid?
+    assert_includes endpoint.errors[:custom_headers].join, "reserved or transport headers"
+  end
+
+  test "allows a normal custom_headers entry alongside the denylist" do
+    assert build(custom_headers: { "Authorization" => "Bearer x" }).valid?
+  end
+
   test "regenerate_signing_secret! records the previous secret and rotation time" do
     endpoint = build.tap(&:save!)
     old = endpoint.signing_secret
