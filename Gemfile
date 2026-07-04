@@ -6,6 +6,7 @@ gemspec
 
 gem "sqlite3"
 gem "webmock"
+gem "minitest-mock"
 
 gem "puma"
 
