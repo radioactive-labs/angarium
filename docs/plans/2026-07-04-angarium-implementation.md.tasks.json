@@ -62,6 +62,13 @@
       "status": "completed",
       "blockedBy": [6],
       "description": "angarium:install generator writes initializer; README + CHANGELOG.\n\n```json:metadata\n{\"files\":[\"lib/generators/angarium/install/install_generator.rb\",\"lib/generators/angarium/install/templates/initializer.rb\",\"README.md\",\"CHANGELOG.md\",\"test/generators/angarium/install_generator_test.rb\"],\"verifyCommand\":\"bin/rails test test/generators/angarium/install_generator_test.rb\",\"requiresUserVerification\":false}\n```"
+    },
+    {
+      "id": "8-hardening",
+      "subject": "Task 8: Security hardening from final review",
+      "status": "completed",
+      "blockedBy": [7],
+      "description": "Fix SSRF bypasses (mapped IPv6, 0.0.0.0/::), add connect timeout, DeliverJob pending? guard, doc corrections.\n\n```json:metadata\n{\"files\":[\"lib/angarium/address_policy.rb\",\"app/jobs/angarium/deliver_job.rb\",\"lib/angarium/client.rb\",\"lib/angarium/configuration.rb\",\"test/lib/angarium/address_policy_test.rb\",\"README.md\",\"lib/generators/angarium/install/templates/initializer.rb\"],\"verifyCommand\":\"bin/rails test\",\"requiresUserVerification\":false}\n```"
     }
   ],
   "lastUpdated": "2026-07-04T00:00:00Z"
