@@ -1,4 +1,5 @@
 require "test_helper"
+require "ipaddr"
 
 class Angarium::DeliverJobTest < ActiveSupport::TestCase
   include ActiveJob::TestHelper
@@ -70,7 +71,7 @@ class Angarium::DeliverJobTest < ActiveSupport::TestCase
     stub = stub_request(:post, "https://example.test/hook")
     delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
 
-    Angarium::AddressPolicy.stub(:host_permitted_for_validation?, false) do
+    Angarium::AddressPolicy.stub(:resolve, [IPAddr.new("127.0.0.1")]) do
       perform_enqueued_jobs
     end
 
@@ -78,5 +79,23 @@ class Angarium::DeliverJobTest < ActiveSupport::TestCase
     assert delivery.blocked?, "expected blocked, was #{delivery.state}"
     assert_not_requested stub
     assert_match(/blocked/i, delivery.delivery_attempts.sole.error)
+  end
+
+  test "pins the connection to the validated resolved IP" do
+    capturing = Class.new do
+      attr_reader :captured
+      def post(url, body:, headers:, addresses: nil)
+        @captured = { url: url, addresses: addresses }
+        Angarium::Client::Result.new(success: true, code: 200, body: "ok", duration: 0.0)
+      end
+    end.new
+
+    delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
+    Angarium::AddressPolicy.stub(:resolve, [IPAddr.new("93.184.216.34")]) do
+      delivery.deliver!(client: capturing)
+    end
+
+    assert_equal ["93.184.216.34"], capturing.captured[:addresses]
+    assert delivery.reload.succeeded?
   end
 end

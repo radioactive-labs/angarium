@@ -100,12 +100,15 @@ delivery time:
 > **Note:** `allow_private_network` is a privileged control. Expose it only to
 > trusted operators, never to end users — otherwise it becomes an SSRF opt-in.
 
-**Known limitation (v1):** the delivery-time check re-resolves the host and
-rejects disallowed addresses, but does not yet pin the connection to the
-validated IP. A determined attacker controlling DNS could exploit a sub-second
-rebinding window between resolution and connection. Full IP-pinning (connect to
-the validated address with Host/SNI preserved) is planned for a future release.
-HTTPX does not follow redirects, so redirect-based bypasses are already closed.
+**Connect-time IP pinning:** the delivery-time check re-resolves the host,
+rejects disallowed addresses, and then pins the connection to exactly the
+validated IP(s) — HTTPX does not re-resolve or connect elsewhere, while TLS
+SNI and certificate verification still use the original hostname. This closes
+the DNS-rebinding window between resolution and connection. The one narrow
+residual: if Angarium's own resolver returns no answer for a host that HTTPX's
+underlying resolver can still resolve, that request proceeds unpinned (nothing
+resolved to a disallowed IP, so there's nothing to have blocked). HTTPX does
+not follow redirects, so redirect-based bypasses are already closed.
 
 ## Configuration
 

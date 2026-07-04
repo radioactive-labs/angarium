@@ -10,3 +10,5 @@
 - SSRF protection: global private-IP block, per-endpoint `allow_private_network`
   and `allowed_networks` controls, enforced at validation and delivery time.
 - Install generator and migrations.
+- Connect-time IP pinning: deliveries pin to the validated resolved address,
+  closing the DNS-rebinding window.

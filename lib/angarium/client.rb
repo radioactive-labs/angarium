@@ -10,9 +10,12 @@ module Angarium
       def success? = success
     end
 
-    def post(url, body:, headers:)
+    def post(url, body:, headers:, addresses: nil)
+      conn = self.class.connection
+      conn = conn.with(addresses: addresses) if addresses && !addresses.empty?
+
       started = monotonic
-      response = self.class.connection.post(url, body: body, headers: headers)
+      response = conn.post(url, body: body, headers: headers)
       duration = monotonic - started
 
       if response.is_a?(HTTPX::ErrorResponse)
