@@ -2,3 +2,7 @@
 /test/dummy/log/*
 !/test/dummy/log/.keep
 /test/tmp/
+
+gemfiles/*.gemfile.lock
+*.gem
+/gemfiles/vendor
