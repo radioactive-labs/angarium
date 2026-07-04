@@ -53,9 +53,14 @@ class Angarium::StandardWebhooksConformanceTest < ActiveSupport::TestCase
 
   test "emitted request verifies with the official standardwebhooks library" do
     call = deliver!
-    parsed = verifier(@endpoint.signing_secret).verify(call.body, sw_headers(call))
-    assert_equal "conformance.test", parsed["event"]
-    assert_equal({ "hello" => "world" }, parsed["data"])
+    # Conformance = the official library accepts our request. verify's RETURN
+    # shape differs across gem versions (1.0.1 symbolizes keys, 1.1.0 doesn't),
+    # so assert it doesn't raise, and check envelope contents by parsing the
+    # body ourselves rather than relying on verify's return.
+    assert_nothing_raised { verifier(@endpoint.signing_secret).verify(call.body, sw_headers(call)) }
+    envelope = JSON.parse(call.body)
+    assert_equal "conformance.test", envelope["event"]
+    assert_equal({ "hello" => "world" }, envelope["data"])
   end
 
   test "webhook-id header equals the envelope id" do
@@ -66,7 +71,7 @@ class Angarium::StandardWebhooksConformanceTest < ActiveSupport::TestCase
 
   test "signs the raw bytes: a non-ASCII payload still verifies" do
     call = deliver!("conformance.unicode", { "note" => "héllo — ünïcode ✓" })
-    assert verifier(@endpoint.signing_secret).verify(call.body, sw_headers(call))
+    assert_nothing_raised { verifier(@endpoint.signing_secret).verify(call.body, sw_headers(call)) }
   end
 
   test "a tampered body is rejected" do
@@ -94,8 +99,8 @@ class Angarium::StandardWebhooksConformanceTest < ActiveSupport::TestCase
 
     # The official library iterates the space-delimited v1 tokens, so a receiver
     # holding EITHER secret must succeed.
-    assert verifier(new_secret).verify(call.body, headers)
-    assert verifier(old_secret).verify(call.body, headers)
+    assert_nothing_raised { verifier(new_secret).verify(call.body, headers) }
+    assert_nothing_raised { verifier(old_secret).verify(call.body, headers) }
     assert_equal 2, headers["webhook-signature"].split(" ").length
   end
 
@@ -109,7 +114,7 @@ class Angarium::StandardWebhooksConformanceTest < ActiveSupport::TestCase
       call = deliver!("conformance.post_grace")
       headers = sw_headers(call)
 
-      assert verifier(new_secret).verify(call.body, headers)
+      assert_nothing_raised { verifier(new_secret).verify(call.body, headers) }
       assert_raises(StandardWebhooks::WebhookVerificationError) do
         verifier(old_secret).verify(call.body, headers)
       end
