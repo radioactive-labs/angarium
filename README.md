@@ -1,5 +1,8 @@
 # Angarium
 
+[![CI](https://github.com/radioactive-labs/angarium/actions/workflows/ci.yml/badge.svg)](https://github.com/radioactive-labs/angarium/actions/workflows/ci.yml)
+[![Standard Webhooks](https://img.shields.io/badge/Standard%20Webhooks-compliant-3068b7)](https://www.standardwebhooks.com)
+
 Outbound webhooks for Rails: signed, retried, subscription-based delivery.
 
 Angarium is a Rails engine that delivers outbound webhooks with HMAC
