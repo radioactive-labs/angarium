@@ -1,76 +1,115 @@
 require "test_helper"
+require "base64"
 
 class Angarium::SignatureTest < ActiveSupport::TestCase
+  # Standard Webhooks conformance vector (https://www.standardwebhooks.com).
+  # This exact input/output MUST match byte-for-byte so receivers can verify
+  # with any off-the-shelf standardwebhooks/Svix library.
+  test "matches the Standard Webhooks canonical test vector" do
+    signature = Angarium::Signature.sign(
+      payload: '{"test": 2432232314}',
+      id: "msg_p5jXN8AQM9LWM0D4loKWxJek",
+      timestamp: 1614265330,
+      secret: "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+    )
+    assert_equal "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=", signature
+  end
+
+  def secret
+    "whsec_#{Base64.strict_encode64("0" * 32)}"
+  end
+
   test "sign then verify round-trips" do
-    header = Angarium::Signature.sign(payload: "body", secret: "shh", timestamp: 1_000)
-    assert_match(/\At=1000,v1=[0-9a-f]{64}\z/, header)
-    assert Angarium::Signature.verify(payload: "body", header: header, secret: "shh", now: 1_100)
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: secret)
+    assert_match(%r{\Av1,[A-Za-z0-9+/=]+\z}, sig)
+    assert Angarium::Signature.verify(
+      payload: "body", id: "1", timestamp: 1_000, signature: sig, secret: secret, now: 1_100
+    )
   end
 
   test "rejects tampered payload" do
-    header = Angarium::Signature.sign(payload: "body", secret: "shh", timestamp: 1_000)
-    refute Angarium::Signature.verify(payload: "TAMPERED", header: header, secret: "shh", now: 1_100)
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: secret)
+    refute Angarium::Signature.verify(
+      payload: "TAMPERED", id: "1", timestamp: 1_000, signature: sig, secret: secret, now: 1_100
+    )
   end
 
   test "rejects wrong secret" do
-    header = Angarium::Signature.sign(payload: "body", secret: "shh", timestamp: 1_000)
-    refute Angarium::Signature.verify(payload: "body", header: header, secret: "nope", now: 1_100)
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: secret)
+    other = "whsec_#{Base64.strict_encode64("1" * 32)}"
+    refute Angarium::Signature.verify(
+      payload: "body", id: "1", timestamp: 1_000, signature: sig, secret: other, now: 1_100
+    )
   end
 
   test "rejects stale timestamp beyond tolerance" do
-    header = Angarium::Signature.sign(payload: "body", secret: "shh", timestamp: 1_000)
-    refute Angarium::Signature.verify(payload: "body", header: header, secret: "shh", now: 9_999, tolerance: 300)
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: secret)
+    refute Angarium::Signature.verify(
+      payload: "body", id: "1", timestamp: 1_000, signature: sig, secret: secret, now: 9_999, tolerance: 300
+    )
   end
 
   test "rejects future timestamp beyond tolerance" do
-    header = Angarium::Signature.sign(payload: "body", secret: "shh", timestamp: 10_000)
-    refute Angarium::Signature.verify(payload: "body", header: header, secret: "shh", now: 1_000, tolerance: 300)
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 10_000, secret: secret)
+    refute Angarium::Signature.verify(
+      payload: "body", id: "1", timestamp: 10_000, signature: sig, secret: secret, now: 1_000, tolerance: 300
+    )
   end
 
   test "accepts timestamp within tolerance on either side" do
-    header = Angarium::Signature.sign(payload: "body", secret: "shh", timestamp: 1_000)
-    assert Angarium::Signature.verify(payload: "body", header: header, secret: "shh", now: 1_200, tolerance: 300)
-    assert Angarium::Signature.verify(payload: "body", header: header, secret: "shh", now: 800, tolerance: 300)
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: secret)
+    assert Angarium::Signature.verify(
+      payload: "body", id: "1", timestamp: 1_000, signature: sig, secret: secret, now: 1_200, tolerance: 300
+    )
+    assert Angarium::Signature.verify(
+      payload: "body", id: "1", timestamp: 1_000, signature: sig, secret: secret, now: 800, tolerance: 300
+    )
   end
 
-  test "rejects malformed header" do
-    refute Angarium::Signature.verify(payload: "body", header: "garbage", secret: "shh", now: 1_000)
+  test "rejects a non-numeric timestamp" do
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: secret)
+    refute Angarium::Signature.verify(
+      payload: "body", id: "1", timestamp: "abc", signature: sig, secret: secret, now: 1_000
+    )
   end
 
-  test "single-secret sign still produces one v1 and verifies" do
-    header = Angarium::Signature.sign(payload: "body", secret: "shh", timestamp: 1_000)
-    assert_equal 1, header.scan("v1=").size
-    assert Angarium::Signature.verify(payload: "body", header: header, secret: "shh", now: 1_100)
+  test "rejects a malformed signature header" do
+    refute Angarium::Signature.verify(
+      payload: "body", id: "1", timestamp: 1_000, signature: "garbage", secret: secret, now: 1_000
+    )
   end
 
-  test "signing with an array of secrets yields two distinct v1 values" do
-    header = Angarium::Signature.sign(payload: "body", secret: %w[old new], timestamp: 1_000)
-    _ts, v1s = Angarium::Signature.parse(header)
-    assert_equal 2, v1s.size
-    assert_equal v1s, v1s.uniq
-    assert_match(/\At=1000,v1=[0-9a-f]{64},v1=[0-9a-f]{64}\z/, header)
+  test "single-secret sign produces one v1 token and verifies" do
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: secret)
+    assert_equal 1, sig.split(" ").size
+    assert Angarium::Signature.verify(
+      payload: "body", id: "1", timestamp: 1_000, signature: sig, secret: secret, now: 1_100
+    )
+  end
+
+  test "signing with an array of secrets yields two space-delimited v1 tokens" do
+    a = "whsec_#{Base64.strict_encode64("a" * 32)}"
+    b = "whsec_#{Base64.strict_encode64("b" * 32)}"
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: [a, b])
+    tokens = sig.split(" ")
+    assert_equal 2, tokens.size
+    assert tokens.all? { |t| t.start_with?("v1,") }
+    assert_equal tokens, tokens.uniq
   end
 
   test "verify succeeds for a receiver holding either rotated secret" do
-    header = Angarium::Signature.sign(payload: "body", secret: %w[old new], timestamp: 1_000)
-    assert Angarium::Signature.verify(payload: "body", header: header, secret: "old", now: 1_100)
-    assert Angarium::Signature.verify(payload: "body", header: header, secret: "new", now: 1_100)
-    refute Angarium::Signature.verify(payload: "body", header: header, secret: "other", now: 1_100)
+    a = "whsec_#{Base64.strict_encode64("a" * 32)}"
+    b = "whsec_#{Base64.strict_encode64("b" * 32)}"
+    c = "whsec_#{Base64.strict_encode64("c" * 32)}"
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: [a, b])
+    assert Angarium::Signature.verify(payload: "body", id: "1", timestamp: 1_000, signature: sig, secret: a, now: 1_100)
+    assert Angarium::Signature.verify(payload: "body", id: "1", timestamp: 1_000, signature: sig, secret: b, now: 1_100)
+    refute Angarium::Signature.verify(payload: "body", id: "1", timestamp: 1_000, signature: sig, secret: c, now: 1_100)
   end
 
-  test "parse collects all valid v1 values and returns an array" do
-    ts, v1s = Angarium::Signature.parse("t=1000,v1=#{"a" * 64},v1=#{"b" * 64}")
-    assert_equal 1000, ts
-    assert_equal ["a" * 64, "b" * 64], v1s
-  end
-
-  test "parse drops malformed v1 values but keeps valid ones" do
-    _ts, v1s = Angarium::Signature.parse("t=1000,v1=nope,v1=#{"c" * 64}")
-    assert_equal ["c" * 64], v1s
-  end
-
-  test "parse returns nil when no valid v1 remains" do
-    assert_nil Angarium::Signature.parse("t=1000,v1=nope")
-    assert_nil Angarium::Signature.parse("t=abc,v1=#{"a" * 64}")
+  test "parse keeps the base64 payload of each v1 token and drops others" do
+    assert_equal ["abc", "def"], Angarium::Signature.parse("v1,abc v1,def")
+    assert_equal ["abc"], Angarium::Signature.parse("v1,abc v2,def")
+    assert_equal [], Angarium::Signature.parse("garbage")
   end
 end

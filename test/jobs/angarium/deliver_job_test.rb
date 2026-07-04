@@ -39,23 +39,31 @@ class Angarium::DeliverJobTest < ActiveSupport::TestCase
     assert_equal ["203.0.113.10"], fake.last.addresses
   end
 
-  test "request carries signature header and json envelope" do
+  test "request carries the Standard Webhooks headers and json envelope" do
     fake = FakeAngariumClient.new(
       Angarium::Client::Result.new(success: true, code: 200, body: "ok", duration: 0.0)
     )
 
-    Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
+    delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
     Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
 
     call = fake.last
     assert call, "expected a request to be made"
-    assert call.headers["X-Angarium-Signature"].present?
+    assert_equal delivery.id.to_s, call.headers["webhook-id"]
+    assert_match(/\A\d+\z/, call.headers["webhook-timestamp"])
+    assert call.headers["webhook-signature"].present?
+
     envelope = JSON.parse(call.body)
     assert_equal "invoice.paid", envelope["event"]
     assert_equal({ "id" => 1 }, envelope["data"])
     assert envelope["id"].present?
+
     assert Angarium::Signature.verify(
-      payload: call.body, header: call.headers["X-Angarium-Signature"], secret: "shh"
+      payload: call.body,
+      id: call.headers["webhook-id"],
+      timestamp: call.headers["webhook-timestamp"],
+      signature: call.headers["webhook-signature"],
+      secret: @endpoint.signing_secret
     )
   end
 

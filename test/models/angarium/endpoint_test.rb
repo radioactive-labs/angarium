@@ -1,5 +1,6 @@
 require "test_helper"
 require "ipaddr"
+require "base64"
 
 class Angarium::EndpointTest < ActiveSupport::TestCase
   setup { @owner = Owner.create!(name: "Acme") }
@@ -20,9 +21,15 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
   end
 
   test "keeps a provided signing_secret" do
-    endpoint = build(signing_secret: "explicit")
+    explicit = "whsec_#{Base64.strict_encode64("0" * 32)}"
+    endpoint = build(signing_secret: explicit)
     endpoint.save!
-    assert_equal "explicit", endpoint.signing_secret
+    assert_equal explicit, endpoint.signing_secret
+  end
+
+  test "generated signing_secret uses the Standard Webhooks whsec_ format" do
+    endpoint = build.tap(&:save!)
+    assert_match(/\Awhsec_/, endpoint.signing_secret)
   end
 
   test "signing_secret is encrypted at rest and transparently decrypted" do

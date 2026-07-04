@@ -43,10 +43,18 @@ module Angarium
       end
 
       body = request_body
+      ts = Time.now.to_i
+      webhook_id = id.to_s
+      signature = Signature.sign(payload: body, id: webhook_id, timestamp: ts, secret: endpoint.active_signing_secrets)
+      headers = (endpoint.custom_headers || {}).merge(
+        "webhook-id" => webhook_id,
+        "webhook-timestamp" => ts.to_s,
+        "webhook-signature" => signature
+      )
       result = client.post(
         endpoint.url,
         body: body,
-        headers: (endpoint.custom_headers || {}).merge(Angarium.config.signature_header => sign(body)),
+        headers: headers,
         # Pin the connection to exactly the IP(s) we just validated, so HTTPX
         # can't re-resolve and connect somewhere else after our check (the
         # rebinding window). TLS SNI/cert verification still uses the URL's
@@ -136,10 +144,6 @@ module Angarium
         created_at: created_at.iso8601,
         data: event.payload
       }.to_json
-    end
-
-    def sign(body)
-      Signature.sign(payload: body, secret: endpoint.active_signing_secrets)
     end
   end
 end

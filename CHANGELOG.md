@@ -5,7 +5,11 @@
 ### Added
 - Mountable engine with `Angarium::Endpoint`, `Event`, `Delivery`, `DeliveryAttempt`.
 - `Angarium.dispatch` event fan-out to active, subscribed endpoints.
-- HMAC request signing and `Angarium::Signature.verify` helper.
+- Webhook signatures follow the [Standard Webhooks](https://www.standardwebhooks.com)
+  spec (`webhook-id`/`webhook-timestamp`/`webhook-signature` headers, `whsec_`
+  secrets, HMAC-SHA256 over `id.timestamp.body`), so receivers can verify with
+  off-the-shelf `standardwebhooks`/Svix libraries in any language.
+  `Angarium::Signature.verify` is provided as a convenience.
 - ActiveJob-based delivery with retries and exponential backoff.
 - SSRF protection: global private-IP block, per-endpoint `allow_private_network`
   and `allowed_networks` controls, enforced at validation and delivery time.

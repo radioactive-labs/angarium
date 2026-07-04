@@ -75,41 +75,60 @@ ActiveJob per delivery. Each request is a JSON envelope:
 
 ## Verifying signatures (receiver side)
 
-Every request carries `X-Angarium-Signature: t=<ts>,v1=<hmac_sha256>`. Verify it
-with the endpoint's `signing_secret`:
+**Angarium signs webhooks using the [Standard Webhooks](https://www.standardwebhooks.com)
+specification**, so receivers can verify them with the official
+[`standardwebhooks` libraries](https://github.com/standard-webhooks/standard-webhooks/tree/main/libraries)
+in any language (Ruby, Python, JavaScript, Go, Rust, PHP, Java, …) — no
+Angarium-specific code required.
+
+Every request carries three headers:
+
+| Header | Value |
+| --- | --- |
+| `webhook-id` | Unique, retry-stable message id (the delivery's id). |
+| `webhook-timestamp` | Unix seconds when the request was signed. |
+| `webhook-signature` | Space-delimited list of `v1,<base64 HMAC-SHA256>` tokens (one per active signing secret). |
+
+The signature is `HMAC-SHA256(secret_key, "{webhook-id}.{webhook-timestamp}.{body}")`,
+base64-encoded, where `secret_key` is the base64-decoded portion of the
+`whsec_`-prefixed `signing_secret`.
+
+You can verify with any Standard Webhooks library, or with Angarium's own helper:
 
 ```ruby
 Angarium::Signature.verify(
-  payload: request.raw_post,
-  header:  request.headers["X-Angarium-Signature"],
-  secret:  endpoint.signing_secret
+  payload:   request.raw_post,
+  id:        request.headers["webhook-id"],
+  timestamp: request.headers["webhook-timestamp"],
+  signature: request.headers["webhook-signature"],
+  secret:    endpoint.signing_secret
 ) # => true / false
 ```
 
-The signature is computed over `"{timestamp}.{body}"` with HMAC-SHA256, and
 `verify` also enforces a timestamp tolerance (default 300s) to resist replay.
 
-The secret is stored encrypted at rest and is only decrypted in memory when
-signing; `endpoint.signing_secret` returns the plaintext, so deliver it to
-receivers over a secure channel.
+The secret (a `whsec_…` string) is stored encrypted at rest and is only
+decrypted in memory when signing; `endpoint.signing_secret` returns the
+plaintext, so deliver it to receivers over a secure channel.
 
 ### Rotating a signing secret (zero-downtime)
 
 Rotate a secret with `endpoint.regenerate_signing_secret!` (returns the new
 plaintext). During a grace window (`config.signing_secret_grace_period`, default
 `24.hours`) every delivery is signed with **both** the new and the previous
-secret — the header carries multiple `v1=` values:
+secret — the `webhook-signature` header carries multiple space-delimited `v1,`
+tokens:
 
 ```
-X-Angarium-Signature: t=<ts>,v1=<new_hmac>,v1=<previous_hmac>
+webhook-signature: v1,<new_sig> v1,<previous_sig>
 ```
 
-`Angarium::Signature.verify` succeeds if the payload matches **any** signature
-in the header, so a receiver still holding the old secret keeps validating while
-you roll it over, and one holding the new secret validates immediately. Once the
-grace period elapses, deliveries are signed with the new secret only. This lets
-receivers update their copy of the secret with zero downtime and no rejected
-deliveries.
+Verification succeeds if the payload matches **any** token in the header (the
+Standard Webhooks libraries already do this), so a receiver still holding the
+old secret keeps validating while you roll it over, and one holding the new
+secret validates immediately. Once the grace period elapses, deliveries are
+signed with the new secret only. This lets receivers update their copy of the
+secret with zero downtime and no rejected deliveries.
 
 ### Per-endpoint custom headers
 
@@ -120,8 +139,9 @@ expects) to every request from an endpoint:
 endpoint.update!(custom_headers: { "Authorization" => "Bearer abc123" })
 ```
 
-`custom_headers` must be a hash of string keys and values. The signature header
-always wins, so a custom header can never override or spoof it.
+`custom_headers` must be a hash of string keys and values. The `webhook-id`,
+`webhook-timestamp`, and `webhook-signature` headers always win, so a custom
+header can never override or spoof them.
 
 ## Retries
 
@@ -222,7 +242,7 @@ bypasses are already closed.
 
 Run `bin/rails g angarium:install` to generate `config/initializers/angarium.rb`
 with all options: `job_queue`, `http_timeout`, `open_timeout`, `user_agent`,
-`retry_schedule`, `signature_header`, `block_private_ips`, `primary_key_type`,
+`retry_schedule`, `block_private_ips`, `primary_key_type`,
 `max_response_body_bytes`, `auto_disable_endpoint_after`, `respect_retry_after`,
 `max_retry_after`, `retry_jitter`, and `signing_secret_grace_period`.
 

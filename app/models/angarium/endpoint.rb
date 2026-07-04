@@ -1,4 +1,5 @@
 require "securerandom"
+require "base64"
 
 module Angarium
   class Endpoint < ApplicationRecord
@@ -29,7 +30,7 @@ module Angarium
     validate :custom_headers_are_strings
 
     def self.generate_signing_secret
-      SecureRandom.hex(32)
+      "whsec_#{Base64.strict_encode64(SecureRandom.bytes(32))}"
     end
 
     def subscribed_to?(event_name)

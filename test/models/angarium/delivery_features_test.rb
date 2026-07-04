@@ -37,18 +37,25 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     create_delivery.deliver!(client: fake)
 
     assert_equal "Bearer x", fake.last.headers["Authorization"]
-    assert fake.last.headers[Angarium.config.signature_header].present?
+    assert fake.last.headers["webhook-signature"].present?
   end
 
-  test "a custom header cannot override the signature header" do
-    @endpoint.update!(custom_headers: { Angarium.config.signature_header => "evil" })
+  test "a custom header cannot override the webhook-signature header" do
+    @endpoint.update!(custom_headers: { "webhook-signature" => "evil" })
     fake = succeeding_client
     delivery = create_delivery
     delivery.deliver!(client: fake)
 
-    sig = fake.last.headers[Angarium.config.signature_header]
+    call = fake.last
+    sig = call.headers["webhook-signature"]
     refute_equal "evil", sig
-    assert Angarium::Signature.verify(payload: fake.last.body, header: sig, secret: "shh")
+    assert Angarium::Signature.verify(
+      payload: call.body,
+      id: call.headers["webhook-id"],
+      timestamp: call.headers["webhook-timestamp"],
+      signature: sig,
+      secret: @endpoint.signing_secret
+    )
   end
 
   # --- Retry-After ------------------------------------------------------------
@@ -178,11 +185,20 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
 
     fake = succeeding_client
     create_delivery.deliver!(client: fake)
-    header = fake.last.headers[Angarium.config.signature_header]
-    body = fake.last.body
+    call = fake.last
+    sig = call.headers["webhook-signature"]
 
-    assert Angarium::Signature.verify(payload: body, header: header, secret: old_secret)
-    assert Angarium::Signature.verify(payload: body, header: header, secret: new_secret)
+    # Two space-delimited v1 tokens during the grace window.
+    assert_equal 2, sig.split(" ").size
+
+    assert Angarium::Signature.verify(
+      payload: call.body, id: call.headers["webhook-id"],
+      timestamp: call.headers["webhook-timestamp"], signature: sig, secret: old_secret
+    )
+    assert Angarium::Signature.verify(
+      payload: call.body, id: call.headers["webhook-id"],
+      timestamp: call.headers["webhook-timestamp"], signature: sig, secret: new_secret
+    )
   end
 
   test "past the grace window only the new secret verifies" do
@@ -192,10 +208,19 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
 
     fake = succeeding_client
     create_delivery.deliver!(client: fake)
-    header = fake.last.headers[Angarium.config.signature_header]
-    body = fake.last.body
+    call = fake.last
+    sig = call.headers["webhook-signature"]
 
-    refute Angarium::Signature.verify(payload: body, header: header, secret: old_secret)
-    assert Angarium::Signature.verify(payload: body, header: header, secret: new_secret)
+    # Only the new secret signs past the grace window.
+    assert_equal 1, sig.split(" ").size
+
+    refute Angarium::Signature.verify(
+      payload: call.body, id: call.headers["webhook-id"],
+      timestamp: call.headers["webhook-timestamp"], signature: sig, secret: old_secret
+    )
+    assert Angarium::Signature.verify(
+      payload: call.body, id: call.headers["webhook-id"],
+      timestamp: call.headers["webhook-timestamp"], signature: sig, secret: new_secret
+    )
   end
 end
