@@ -10,23 +10,30 @@
     {
       "id": 1,
       "subject": "Task 1: Schema, base record, and models with associations",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [0],
       "description": "Four migrations + four models (+abstract base) with associations.\n\n```json:metadata\n{\"files\":[\"db/migrate/20260704000001_create_angarium_endpoints.rb\",\"db/migrate/20260704000002_create_angarium_events.rb\",\"db/migrate/20260704000003_create_angarium_deliveries.rb\",\"db/migrate/20260704000004_create_angarium_delivery_attempts.rb\",\"app/models/angarium/application_record.rb\",\"app/models/angarium/endpoint.rb\",\"app/models/angarium/event.rb\",\"app/models/angarium/delivery.rb\",\"app/models/angarium/delivery_attempt.rb\",\"test/dummy/app/models/owner.rb\",\"test/models/angarium/associations_test.rb\"],\"verifyCommand\":\"bin/rails test test/models/angarium/associations_test.rb\",\"requiresUserVerification\":false}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: Endpoint behaviors — secret, URL/SSRF validation, subscription matching",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [1],
       "description": "Secret generation, https+SSRF URL validation, subscribed_to? matching.\n\n```json:metadata\n{\"files\":[\"lib/angarium/event_matcher.rb\",\"lib/angarium.rb\",\"app/validators/angarium/endpoint_url_validator.rb\",\"app/models/angarium/endpoint.rb\",\"test/lib/angarium/event_matcher_test.rb\",\"test/models/angarium/endpoint_test.rb\"],\"verifyCommand\":\"bin/rails test test/models/angarium/endpoint_test.rb test/lib/angarium/event_matcher_test.rb\",\"requiresUserVerification\":false}\n```"
     },
     {
       "id": 3,
       "subject": "Task 3: Signature module (HMAC sign + verify)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [0],
       "description": "HMAC sign + verify with replay tolerance.\n\n```json:metadata\n{\"files\":[\"lib/angarium/signature.rb\",\"lib/angarium.rb\",\"test/lib/angarium/signature_test.rb\"],\"verifyCommand\":\"bin/rails test test/lib/angarium/signature_test.rb\",\"requiresUserVerification\":false}\n```"
+    },
+    {
+      "id": "3b",
+      "subject": "Task 3b: AddressPolicy + per-endpoint SSRF controls",
+      "status": "completed",
+      "blockedBy": [2],
+      "description": "Shared AddressPolicy (two-gate: private denylist needs allow_private_network; allowlist narrows only). Adds allow_private_network + allowed_networks columns; validator delegates to policy.\n\n```json:metadata\n{\"files\":[\"db/migrate/20260704000001_create_angarium_endpoints.rb\",\"lib/angarium/address_policy.rb\",\"app/validators/angarium/endpoint_url_validator.rb\",\"app/models/angarium/endpoint.rb\",\"test/lib/angarium/address_policy_test.rb\"],\"verifyCommand\":\"bin/rails test test/lib/angarium/address_policy_test.rb test/models/angarium/endpoint_test.rb\",\"requiresUserVerification\":false}\n```"
     },
     {
       "id": 4,

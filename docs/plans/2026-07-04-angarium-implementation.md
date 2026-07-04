@@ -1530,3 +1530,49 @@ git commit -m "Add install generator, README, and CHANGELOG"
 - **Spec coverage:** owned polymorphic Endpoint (T1–2), HMAC signing (T3, T5), dispatch/subscriptions (T2, T4), retry+backoff (T6), ActiveJob delivery (T5), SSRF (T2), Minitest+WebMock (all), packaging/install (T0, T7). All spec sections map to a task.
 - **Type consistency:** `Client::Result#success?`, `Delivery` states `%w[pending delivering succeeded exhausted]`, `Signature.sign/verify`, `EventMatcher.match?`, `Dispatch.call` used consistently across tasks.
 - **Verification requirement scan:** the prompt asks to build/package a gem — no human-in-the-loop verification requested. **NO.** No verification task required.
+
+---
+
+## Addendum — mid-execution changes (2026-07-04)
+
+Requested during execution; these supersede the original Task 2 SSRF text.
+
+### DB switched to SQLite
+Dummy app uses SQLite; JSON columns use `t.json`. Rebuild the dummy DB with
+`bin/rails db:migrate` run from the **engine root** (not `test/dummy`) so engine
+migrations are picked up.
+
+### Task 3b — `Angarium::AddressPolicy` + per-endpoint SSRF controls
+Two new endpoint columns (inlined in the endpoints `create_table`):
+`allow_private_network:boolean default false`, `allowed_networks:json default []`.
+
+`Angarium::AddressPolicy.ip_allowed?(ip, endpoint)` — **two independent gates,
+both must pass:**
+1. **Private denylist:** private/loopback/link-local IPs are blocked unless
+   `endpoint.allow_private_network` is set (master switch: `config.block_private_ips`).
+   An allowlist entry alone does NOT unlock a private IP.
+2. **Allowlist:** when `endpoint.allowed_networks` is non-empty, the IP must fall
+   within one of those CIDRs. The allowlist can only narrow, never widen past the
+   private block.
+
+To deliver to a private address you need **both** `allow_private_network: true`
+**and** (if using an allowlist) that range in `allowed_networks`.
+
+The save-time validator delegates to `AddressPolicy.host_permitted_for_validation?`
+(lenient: unresolvable hosts pass, re-checked at delivery).
+
+### Task 5 — delivery-time enforcement
+The deliver path must enforce `AddressPolicy` on the destination at delivery
+time (closing the DNS-rebinding TOCTOU gap left by save-time validation only).
+Preferred mechanism: a custom HTTPX resolver that rejects disallowed IPs at
+connect time (validate == pin); disable redirects on the delivery client. If the
+resolver integration proves impractical, fall back to a pre-flight
+`AddressPolicy` re-check in the job before POST and document the residual
+sub-second window. A blocked destination records a `DeliveryAttempt` with an
+error and does not deliver.
+
+### Task 7 — README security section
+Document the three controls (`config.block_private_ips`,
+`endpoint.allow_private_network`, `endpoint.allowed_networks`), the precedence,
+the "private needs the flag even if allowlisted" rule, and the DNS-rebinding /
+IP-pinning limitation with the v2 hardening note.
