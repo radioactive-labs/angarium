@@ -5,6 +5,7 @@ require "angarium/event_matcher"
 require "angarium/signature"
 require "angarium/address_policy"
 require "angarium/dispatch"
+require "angarium/client"
 
 module Angarium
   class << self
