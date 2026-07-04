@@ -176,6 +176,15 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     assert_equal @endpoint.url, fake.last.url
   end
 
+  test "ping! is an alias of send_test_event!" do
+    delivery = nil
+    assert_enqueued_with(job: Angarium::DeliverJob) do
+      delivery = @endpoint.ping!
+    end
+    assert_equal "angarium.test", delivery.event.name
+    assert_equal @endpoint, delivery.endpoint
+  end
+
   # --- Dual-secret rotation ---------------------------------------------------
 
   test "within the grace window a delivery verifies with both old and new secrets" do

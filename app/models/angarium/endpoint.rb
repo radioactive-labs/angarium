@@ -85,6 +85,7 @@ module Angarium
       event = Angarium::Event.create!(name: "angarium.test", payload: payload)
       deliveries.create!(event: event)
     end
+    alias_method :ping!, :send_test_event!
 
     private
 

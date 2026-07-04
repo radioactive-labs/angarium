@@ -194,6 +194,7 @@ Verify an endpoint end-to-end by delivering a synthetic `angarium.test` event
 ```ruby
 delivery = endpoint.send_test_event!
 # optionally: endpoint.send_test_event!(message: "hello")
+endpoint.ping! # alias of send_test_event!
 ```
 
 ### At-least-once delivery
