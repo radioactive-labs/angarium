@@ -26,14 +26,27 @@ module Angarium
     validates :active, inclusion: { in: [true, false] }
     validate :allowed_networks_are_valid_cidrs
 
+    def self.generate_signing_secret
+      SecureRandom.hex(32)
+    end
+
     def subscribed_to?(event_name)
       Array(subscribed_events).any? { |pattern| EventMatcher.match?(pattern, event_name) }
+    end
+
+    # Rotate the signing secret and persist. Returns the new plaintext secret.
+    # Subsequent deliveries sign with the new secret immediately, so update the
+    # receiver's copy in the same window (or run a dual-secret grace period at
+    # the receiver).
+    def regenerate_signing_secret!
+      update!(signing_secret: self.class.generate_signing_secret)
+      signing_secret
     end
 
     private
 
     def ensure_signing_secret
-      self.signing_secret ||= SecureRandom.hex(32)
+      self.signing_secret ||= self.class.generate_signing_secret
     end
 
     def allowed_networks_are_valid_cidrs

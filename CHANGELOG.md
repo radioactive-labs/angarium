@@ -14,3 +14,4 @@
   closing the DNS-rebinding window.
 - Endpoint `signing_secret` is encrypted at rest with Active Record Encryption
   (requires the host app to configure encryption keys).
+- `Endpoint#regenerate_signing_secret!` to rotate an endpoint's signing secret.

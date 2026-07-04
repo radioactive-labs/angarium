@@ -93,6 +93,10 @@ The secret is stored encrypted at rest and is only decrypted in memory when
 signing; `endpoint.signing_secret` returns the plaintext, so deliver it to
 receivers over a secure channel.
 
+Rotate a secret with `endpoint.regenerate_signing_secret!` (returns the new
+plaintext). Deliveries sign with the new secret immediately, so update the
+receiver's copy in the same window.
+
 ## Retries
 
 Failed deliveries (non-2xx or connection errors) are retried on the schedule in

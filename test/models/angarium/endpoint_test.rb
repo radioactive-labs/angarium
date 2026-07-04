@@ -63,6 +63,17 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     refute endpoint.subscribed_to?("user.deleted")
   end
 
+  test "regenerate_signing_secret! rotates and persists a new secret" do
+    endpoint = build.tap(&:save!)
+    old = endpoint.signing_secret
+    returned = endpoint.regenerate_signing_secret!
+
+    refute_equal old, endpoint.signing_secret
+    assert_equal endpoint.signing_secret, returned
+    assert_equal returned, endpoint.reload.signing_secret
+    assert_operator returned.length, :>=, 32
+  end
+
   test "a private URL needs allow_private_network even if allowlisted" do
     only_allowlist = build(url: "https://10.1.2.5/hook", allowed_networks: ["10.1.2.0/24"])
     refute only_allowlist.valid?
