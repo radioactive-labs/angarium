@@ -10,8 +10,6 @@ gem "minitest-mock"
 
 gem "puma"
 
-gem "pg"
-
 gem "sprockets-rails"
 
 # Start debugger with binding.b [https://github.com/ruby/debug]
