@@ -12,6 +12,9 @@
 - Install generator and migrations.
 - Connect-time IP pinning: deliveries pin to the validated resolved address,
   closing the DNS-rebinding window.
+- Delivery fails closed on hosts it can't resolve (never falls back to an
+  unvalidated HTTPX resolution), fully closing the DNS-rebinding
+  resolver-divergence gap.
 - Endpoint `signing_secret` is encrypted at rest with Active Record Encryption
   (requires the host app to configure encryption keys).
 - `Endpoint#regenerate_signing_secret!` to rotate an endpoint's signing secret.

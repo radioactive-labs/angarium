@@ -7,7 +7,7 @@ class Angarium::DeliverJobTest < ActiveSupport::TestCase
   setup do
     @owner = Owner.create!(name: "Acme")
     @endpoint = Angarium::Endpoint.create!(
-      owner: @owner, name: "e", url: "https://example.test/hook",
+      owner: @owner, name: "e", url: "https://203.0.113.10/hook",
       signing_secret: "shh", subscribed_events: ["*"]
     )
     @event = Angarium::Event.create!(name: "invoice.paid", payload: { "id" => 1 })
@@ -20,55 +20,62 @@ class Angarium::DeliverJobTest < ActiveSupport::TestCase
   end
 
   test "successful 2xx delivery marks succeeded and records an attempt" do
-    stub = stub_request(:post, "https://example.test/hook").to_return(status: 200, body: "ok")
+    fake = FakeAngariumClient.new(
+      Angarium::Client::Result.new(success: true, code: 200, body: "ok", duration: 0.0)
+    )
     delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
 
-    perform_enqueued_jobs
+    Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
 
     delivery.reload
     assert delivery.succeeded?, "expected succeeded, was #{delivery.state}"
     assert_equal 1, delivery.attempt_count
     attempt = delivery.delivery_attempts.sole
     assert_equal 200, attempt.response_code
-    assert_requested stub
+    # Confirms the resolvable + pinned path was taken (not fail-closed): a
+    # request was made, pinned to exactly the validated resolved IP.
+    assert fake.requested?, "expected a request to be made"
+    assert_equal "https://203.0.113.10/hook", fake.last.url
+    assert_equal ["203.0.113.10"], fake.last.addresses
   end
 
   test "request carries signature header and json envelope" do
-    body = nil
-    headers = nil
-    stub_request(:post, "https://example.test/hook").to_return(status: 200).with do |req|
-      body = req.body
-      headers = req.headers
-      true
-    end
+    fake = FakeAngariumClient.new(
+      Angarium::Client::Result.new(success: true, code: 200, body: "ok", duration: 0.0)
+    )
 
     Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
-    perform_enqueued_jobs
+    Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
 
-    assert headers["X-Angarium-Signature"].present?
-    envelope = JSON.parse(body)
+    call = fake.last
+    assert call, "expected a request to be made"
+    assert call.headers["X-Angarium-Signature"].present?
+    envelope = JSON.parse(call.body)
     assert_equal "invoice.paid", envelope["event"]
     assert_equal({ "id" => 1 }, envelope["data"])
     assert envelope["id"].present?
     assert Angarium::Signature.verify(
-      payload: body, header: headers["X-Angarium-Signature"], secret: "shh"
+      payload: call.body, header: call.headers["X-Angarium-Signature"], secret: "shh"
     )
   end
 
   test "failed delivery with empty retry schedule is exhausted" do
     Angarium.config.stub(:retry_schedule, []) do
-      stub_request(:post, "https://example.test/hook").to_return(status: 500, body: "boom")
+      fake = FakeAngariumClient.new(
+        Angarium::Client::Result.new(success: false, code: 500, body: "boom", duration: 0.0)
+      )
       delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
-      perform_enqueued_jobs
+      Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
       delivery.reload
       assert delivery.exhausted?, "expected exhausted, was #{delivery.state}"
       assert_equal 1, delivery.attempt_count
       assert_equal 500, delivery.delivery_attempts.sole.response_code
+      assert fake.requested?, "expected a request to be made"
     end
   end
 
   test "blocks delivery to a disallowed destination without making a request" do
-    stub = stub_request(:post, "https://example.test/hook")
+    stub = stub_request(:post, "https://203.0.113.10/hook")
     delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
 
     Angarium::AddressPolicy.stub(:resolve, [IPAddr.new("127.0.0.1")]) do
@@ -91,11 +98,29 @@ class Angarium::DeliverJobTest < ActiveSupport::TestCase
     end.new
 
     delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
-    Angarium::AddressPolicy.stub(:resolve, [IPAddr.new("93.184.216.34")]) do
+    Angarium::AddressPolicy.stub(:resolve, [IPAddr.new("203.0.113.10")]) do
       delivery.deliver!(client: capturing)
     end
 
-    assert_equal ["93.184.216.34"], capturing.captured[:addresses]
+    assert_equal ["203.0.113.10"], capturing.captured[:addresses]
     assert delivery.reload.succeeded?
+  end
+
+  test "fails closed (retryable) when the host cannot be resolved" do
+    Angarium.config.stub(:retry_schedule, []) do
+      stub = stub_request(:post, "https://nope.invalid/hook")
+      endpoint = Angarium::Endpoint.create!(
+        owner: @owner, name: "u", url: "https://nope.invalid/hook",
+        signing_secret: "shh", subscribed_events: ["*"]
+      )
+      delivery = Angarium::Delivery.create!(event: @event, endpoint: endpoint)
+
+      perform_enqueued_jobs
+
+      delivery.reload
+      assert delivery.exhausted?, "expected exhausted, was #{delivery.state}"
+      assert_not_requested stub
+      assert_match(/unresolvable/i, delivery.delivery_attempts.sole.error)
+    end
   end
 end

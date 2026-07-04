@@ -31,6 +31,16 @@ module Angarium
         return attempt
       end
 
+      # Fail closed: our resolver is the single source of truth. If we can't
+      # resolve the host, do NOT let HTTPX resolve it unvalidated — record a
+      # retryable failure. A transient DNS blip is retried; a persistently
+      # unresolvable host eventually exhausts.
+      if addresses.empty?
+        attempt = delivery_attempts.create!(error: "unresolvable host: #{destination_host}")
+        handle_failure!
+        return attempt
+      end
+
       body = request_body
       result = client.post(
         endpoint.url,
@@ -39,9 +49,8 @@ module Angarium
         # Pin the connection to exactly the IP(s) we just validated, so HTTPX
         # can't re-resolve and connect somewhere else after our check (the
         # rebinding window). TLS SNI/cert verification still uses the URL's
-        # host. When we can't resolve (addresses == []), there's no rebinding
-        # risk to guard against (nothing resolved to a disallowed IP), so we
-        # pass no addresses and let HTTPX resolve normally.
+        # host. `addresses` is guaranteed non-empty here (the fail-closed
+        # branch above returned early otherwise), so the connection always pins.
         addresses: addresses.map(&:to_s)
       )
 

@@ -137,11 +137,14 @@ at delivery time:
 rejects disallowed addresses, and then pins the connection to exactly the
 validated IP(s) — HTTPX does not re-resolve or connect elsewhere, while TLS
 SNI and certificate verification still use the original hostname. This closes
-the DNS-rebinding window between resolution and connection. The one narrow
-residual: if Angarium's own resolver returns no answer for a host that HTTPX's
-underlying resolver can still resolve, that request proceeds unpinned (nothing
-resolved to a disallowed IP, so there's nothing to have blocked). HTTPX does
-not follow redirects, so redirect-based bypasses are already closed.
+the DNS-rebinding window between resolution and connection. Angarium's own
+resolver is the single source of truth: if it can't resolve a host, the
+delivery fails (retryable) rather than falling back to an unvalidated HTTPX
+resolution — so there is no unpinned path. The only cost is that hosts
+resolvable *only* via non-DNS mechanisms Angarium's resolver doesn't use
+(e.g. mDNS `.local`) won't be delivered to, which is not a concern for real
+webhook endpoints. HTTPX does not follow redirects, so redirect-based
+bypasses are already closed.
 
 ## Configuration
 
