@@ -12,3 +12,5 @@
 - Install generator and migrations.
 - Connect-time IP pinning: deliveries pin to the validated resolved address,
   closing the DNS-rebinding window.
+- Endpoint `signing_secret` is encrypted at rest with Active Record Encryption
+  (requires the host app to configure encryption keys).

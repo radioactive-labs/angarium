@@ -43,7 +43,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_000100) do
     t.string "name", null: false
     t.integer "owner_id", null: false
     t.string "owner_type", null: false
-    t.string "signing_secret", null: false
+    t.text "signing_secret", null: false
     t.json "subscribed_events", default: [], null: false
     t.datetime "updated_at", null: false
     t.string "url", null: false

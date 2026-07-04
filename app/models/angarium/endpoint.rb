@@ -5,6 +5,8 @@ module Angarium
     belongs_to :owner, polymorphic: true
     has_many :deliveries, class_name: "Angarium::Delivery", dependent: :destroy
 
+    encrypts :signing_secret
+
     # Rails < 8.1's SQLite adapter doesn't parse the `DEFAULT TRUE`/`DEFAULT
     # FALSE` literals SQLite reports back for boolean columns (fixed in
     # ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements

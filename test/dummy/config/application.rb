@@ -30,6 +30,11 @@ module Dummy
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w(assets tasks))
 
+    # Test-only Active Record Encryption keys (Angarium encrypts endpoint secrets).
+    config.active_record.encryption.primary_key = "angarium_test_primary_key_do_not_use_in_prod"
+    config.active_record.encryption.deterministic_key = "angarium_test_deterministic_key_do_not_use"
+    config.active_record.encryption.key_derivation_salt = "angarium_test_key_derivation_salt_do_not_use"
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

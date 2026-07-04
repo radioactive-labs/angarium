@@ -21,6 +21,22 @@ Then:
 bundle install
 bin/rails angarium:install:migrations
 bin/rails g angarium:install
+```
+
+### Required: Active Record Encryption
+
+Angarium encrypts each endpoint's `signing_secret` at rest. Configure Active
+Record Encryption keys before using the gem:
+
+```bash
+bin/rails db:encryption:init
+```
+
+Add the generated keys to your credentials (`config/credentials.yml.enc`) or
+set `config.active_record.encryption.{primary_key,deterministic_key,key_derivation_salt}`.
+See the [Rails guide on Active Record Encryption](https://guides.rubyonrails.org/active_record_encryption.html).
+
+```bash
 bin/rails db:migrate
 ```
 
@@ -72,6 +88,10 @@ Angarium::Signature.verify(
 
 The signature is computed over `"{timestamp}.{body}"` with HMAC-SHA256, and
 `verify` also enforces a timestamp tolerance (default 300s) to resist replay.
+
+The secret is stored encrypted at rest and is only decrypted in memory when
+signing; `endpoint.signing_secret` returns the plaintext, so deliver it to
+receivers over a secure channel.
 
 ## Retries
 

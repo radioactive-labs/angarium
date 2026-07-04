@@ -24,6 +24,20 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     assert_equal "explicit", endpoint.signing_secret
   end
 
+  test "signing_secret is encrypted at rest and transparently decrypted" do
+    endpoint = build.tap(&:save!)
+    plaintext = endpoint.signing_secret
+    assert plaintext.present?
+
+    raw = ActiveRecord::Base.connection_pool.with_connection do |c|
+      c.select_value("SELECT signing_secret FROM angarium_endpoints WHERE id = #{endpoint.id}")
+    end
+    refute_equal plaintext, raw, "stored value must not be the plaintext secret"
+    assert_includes raw, "\"p\":", "expected Active Record Encryption envelope in the DB"
+
+    assert_equal plaintext, endpoint.reload.signing_secret, "must decrypt transparently on read"
+  end
+
   test "requires https" do
     endpoint = build(url: "http://example.test/hook")
     refute endpoint.valid?
