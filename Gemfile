@@ -8,6 +8,9 @@ gem "sqlite3"
 gem "webmock"
 gem "minitest-mock"
 
+# Verify our Standard Webhooks signatures interoperate with the official library.
+gem "standardwebhooks"
+
 gem "puma"
 
 gem "sprockets-rails"
