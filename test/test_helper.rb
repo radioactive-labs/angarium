@@ -16,6 +16,14 @@ require "minitest/mock"
 require "httpx/adapters/webmock"
 WebMock::HttpLibAdapters::HttpxAdapter.enable!
 
+# Pin the whole suite to the :test queue adapter. The dummy app defaults to
+# :async, so any test that creates a Delivery without including
+# ActiveJob::TestHelper would have its after_create_commit DeliverJob run in a
+# background thread — delivering (or fail-closing) mid-test and creating stray
+# DeliveryAttempt rows that race the assertions. With :test, jobs only run under
+# perform_enqueued_jobs, keeping every test deterministic.
+ActiveJob::Base.queue_adapter = :test
+
 # Test double for Angarium::Client.
 #
 # The delivery path now always pins the connection to the validated resolved
