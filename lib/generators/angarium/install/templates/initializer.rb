@@ -23,4 +23,23 @@ Angarium.configure do |config|
 
   # Primary key type for Angarium's own tables.
   # config.primary_key_type = nil # nil = use the app's default (bigint unless overridden); set :uuid etc. to force
+
+  # Truncate the stored response body to this many bytes. nil = store the full body.
+  # config.max_response_body_bytes = 65_536
+
+  # Auto-disable an endpoint after this many consecutive failed deliveries. nil = never.
+  # config.auto_disable_endpoint_after = nil
+
+  # Honor a receiver's Retry-After header (seconds or HTTP-date) for the next attempt.
+  # config.respect_retry_after = true
+
+  # Cap (seconds) applied to a honored Retry-After value. nil = uncapped.
+  # config.max_retry_after = 3600
+
+  # Fraction of additive positive jitter applied to each backoff delay.
+  # config.retry_jitter = 0.15
+
+  # Grace window during which a rotated endpoint's previous signing secret stays
+  # valid (deliveries are signed with both), so receivers can roll over with no downtime.
+  # config.signing_secret_grace_period = 24.hours
 end

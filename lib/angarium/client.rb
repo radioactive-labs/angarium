@@ -6,7 +6,7 @@ module Angarium
   # redirects unless the :follow_redirects plugin is enabled — we intentionally
   # leave it disabled so a 3xx to an internal URL can't bypass SSRF checks.
   class Client
-    Result = Struct.new(:success, :code, :body, :error, :duration, keyword_init: true) do
+    Result = Struct.new(:success, :code, :body, :error, :duration, :headers, keyword_init: true) do
       def success? = success
     end
 
@@ -21,14 +21,20 @@ module Angarium
       if response.is_a?(HTTPX::ErrorResponse)
         return Result.new(success: false,
                           error: "#{response.error.class}: #{response.error.message}",
-                          duration: duration)
+                          duration: duration,
+                          headers: {})
       end
+
+      max = Angarium.config.max_response_body_bytes
+      body = response.body.to_s
+      body = body.byteslice(0, max) if max
 
       Result.new(
         success: (200..299).cover?(response.status),
         code: response.status,
-        body: response.body.to_s[0..1500],
-        duration: duration
+        body: body,
+        duration: duration,
+        headers: response.headers.to_h.transform_keys(&:downcase)
       )
     end
 

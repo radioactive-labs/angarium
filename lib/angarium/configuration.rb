@@ -2,7 +2,9 @@ module Angarium
   class Configuration
     attr_accessor :job_queue, :http_timeout, :open_timeout, :user_agent,
                   :retry_schedule, :signature_header, :block_private_ips,
-                  :primary_key_type
+                  :primary_key_type, :max_response_body_bytes,
+                  :auto_disable_endpoint_after, :respect_retry_after,
+                  :max_retry_after, :retry_jitter, :signing_secret_grace_period
 
     def initialize
       @job_queue        = :default
@@ -13,6 +15,12 @@ module Angarium
       @signature_header = "X-Angarium-Signature"
       @block_private_ips = true
       @primary_key_type = nil
+      @max_response_body_bytes     = 65_536
+      @auto_disable_endpoint_after = nil
+      @respect_retry_after         = true
+      @max_retry_after             = 3600
+      @retry_jitter                = 0.15
+      @signing_secret_grace_period = 24.hours
     end
   end
 end

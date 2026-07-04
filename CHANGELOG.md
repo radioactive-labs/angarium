@@ -24,3 +24,22 @@
   to the host app's generator setting, or bigint); polymorphic `owner_id` is
   now a string column so owners with any primary key type (bigint, UUID, or a
   mix) can be associated.
+- Configurable response-body truncation cap (`config.max_response_body_bytes`,
+  default 64 KiB; `nil` stores the full body).
+- Manual redelivery: `Delivery#redeliver!` resets the retry cycle and re-enqueues,
+  keeping prior attempt history.
+- Endpoint auto-disable after `config.auto_disable_endpoint_after` consecutive
+  failed deliveries (`consecutive_failures`/`disabled_at`), resetting on success.
+- Honors a receiver's `Retry-After` header (seconds or HTTP-date) for the next
+  attempt, capped by `config.max_retry_after` and toggleable via
+  `config.respect_retry_after`.
+- Per-endpoint `custom_headers` sent with every delivery (the signature header
+  always takes precedence).
+- `Endpoint#send_test_event!` delivers a synthetic `angarium.test` event,
+  bypassing subscription matching.
+- Additive positive backoff jitter (`config.retry_jitter`) to avoid retry
+  stampedes.
+- Dual-secret rotation grace: after `regenerate_signing_secret!`, deliveries are
+  signed with both the new and previous secret for
+  `config.signing_secret_grace_period`, and `Signature.verify` accepts any
+  signature in the header, enabling zero-downtime secret rollover.

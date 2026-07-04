@@ -9,6 +9,11 @@ class CreateAngariumEndpoints < ActiveRecord::Migration[7.1]
       t.json :subscribed_events, null: false, default: []
       t.boolean :allow_private_network, null: false, default: false
       t.json :allowed_networks, null: false, default: []
+      t.json :custom_headers, null: false, default: {}
+      t.integer :consecutive_failures, null: false, default: 0
+      t.text :previous_signing_secret
+      t.datetime :secret_rotated_at
+      t.datetime :disabled_at
       t.timestamps
     end
   end

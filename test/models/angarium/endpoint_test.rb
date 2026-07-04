@@ -123,4 +123,52 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     refute endpoint.valid?
     assert_includes endpoint.errors[:allowed_networks].join, "invalid CIDR"
   end
+
+  test "accepts a string=>string custom_headers hash and an empty default" do
+    assert build(custom_headers: { "Authorization" => "Bearer x" }).valid?
+    assert build.valid?
+  end
+
+  test "rejects custom_headers with non-string keys or values" do
+    endpoint = build(custom_headers: { "X-Count" => 3 })
+    refute endpoint.valid?
+    assert_includes endpoint.errors[:custom_headers].join, "hash of string keys and values"
+  end
+
+  test "regenerate_signing_secret! records the previous secret and rotation time" do
+    endpoint = build.tap(&:save!)
+    old = endpoint.signing_secret
+    endpoint.regenerate_signing_secret!
+
+    assert_equal old, endpoint.previous_signing_secret
+    assert endpoint.secret_rotated_at.present?
+  end
+
+  test "active_signing_secrets includes the previous secret only within grace" do
+    endpoint = build.tap(&:save!)
+    old = endpoint.signing_secret
+    new = endpoint.regenerate_signing_secret!
+
+    assert_equal [new, old], endpoint.active_signing_secrets
+
+    endpoint.update!(secret_rotated_at: 2.days.ago)
+    assert_equal [new], endpoint.active_signing_secrets
+  end
+
+  test "record_delivery_failure! disables the endpoint at the configured threshold" do
+    endpoint = build.tap(&:save!)
+    Angarium.config.stub(:auto_disable_endpoint_after, 1) do
+      endpoint.record_delivery_failure!
+    end
+    refute endpoint.active?
+    assert endpoint.disabled_at.present?
+    assert_equal 1, endpoint.consecutive_failures
+  end
+
+  test "record_delivery_success! clears consecutive_failures" do
+    endpoint = build.tap(&:save!)
+    endpoint.update!(consecutive_failures: 3)
+    endpoint.record_delivery_success!
+    assert_equal 0, endpoint.consecutive_failures
+  end
 end
