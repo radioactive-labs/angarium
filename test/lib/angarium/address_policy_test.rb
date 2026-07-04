@@ -46,4 +46,22 @@ class Angarium::AddressPolicyTest < ActiveSupport::TestCase
       assert Angarium::AddressPolicy.ip_allowed?("10.0.0.5", endpoint)
     end
   end
+
+  test "blocks IPv4-mapped IPv6 loopback and link-local (SSRF bypass)" do
+    refute Angarium::AddressPolicy.ip_allowed?("::ffff:127.0.0.1", endpoint)
+    refute Angarium::AddressPolicy.ip_allowed?("::ffff:169.254.169.254", endpoint)
+    refute Angarium::AddressPolicy.ip_allowed?("::ffff:10.0.0.1", endpoint)
+  end
+
+  test "blocks the unspecified address" do
+    refute Angarium::AddressPolicy.ip_allowed?("0.0.0.0", endpoint)
+    refute Angarium::AddressPolicy.ip_allowed?("::", endpoint)
+  end
+
+  test "host_permitted_for_validation? blocks a host that resolves to a disallowed IP" do
+    # 127.0.0.1 is an IP literal; resolve returns [127.0.0.1] which is loopback
+    refute Angarium::AddressPolicy.host_permitted_for_validation?("127.0.0.1", endpoint)
+    # unresolvable host -> [] -> all? -> true (lenient at validation; re-checked at delivery)
+    assert Angarium::AddressPolicy.host_permitted_for_validation?("does-not-exist.invalid", endpoint)
+  end
 end

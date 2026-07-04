@@ -51,8 +51,19 @@ module Angarium
     end
 
     def private?(ip)
+      ip = normalize(ip)
+      return true if ip.to_i.zero? # 0.0.0.0 / :: (unspecified -> localhost on Linux)
+
       ip.loopback? || ip.private? || ip.link_local? ||
         (ip.respond_to?(:unique_local?) && ip.unique_local?)
+    end
+
+    # Collapse IPv4-mapped IPv6 (::ffff:x.x.x.x) to native IPv4 so the predicates
+    # above see the real address; leave other addresses untouched.
+    def normalize(ip)
+      ip.respond_to?(:native) ? ip.native : ip
+    rescue StandardError
+      ip
     end
 
     def cidr_include?(cidr, ip)
@@ -62,8 +73,8 @@ module Angarium
     end
 
     def to_ipaddr(value)
-      return value if value.is_a?(IPAddr)
-      IPAddr.new(value.to_s)
+      ip = value.is_a?(IPAddr) ? value : IPAddr.new(value.to_s)
+      normalize(ip)
     rescue IPAddr::InvalidAddressError
       nil
     end

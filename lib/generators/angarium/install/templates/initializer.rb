@@ -5,6 +5,12 @@ Angarium.configure do |config|
   # HTTP read timeout (seconds) per delivery attempt.
   # config.http_timeout = 10
 
+  # TCP connect timeout (seconds) per delivery attempt.
+  # config.open_timeout = 5
+
+  # User-Agent header sent with each delivery.
+  # config.user_agent = "Angarium/#{Angarium::VERSION}"
+
   # Backoff schedule between retries. Length = number of retries.
   # config.retry_schedule = [1.minute, 5.minutes, 30.minutes, 2.hours, 5.hours]
 

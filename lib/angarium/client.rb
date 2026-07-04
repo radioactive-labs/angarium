@@ -34,7 +34,10 @@ module Angarium
     def self.connection
       HTTPX.with(
         headers: { "user-agent" => Angarium.config.user_agent, "content-type" => "application/json" },
-        timeout: { read_timeout: Angarium.config.http_timeout }
+        timeout: {
+          connect_timeout: Angarium.config.open_timeout,
+          read_timeout: Angarium.config.http_timeout
+        }
       )
     end
   end

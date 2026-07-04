@@ -88,7 +88,8 @@ delivery time:
 
 - **`config.block_private_ips`** (default `true`) — blocks delivery to
   private, loopback, and link-local addresses (e.g. `127.0.0.1`, `10.0.0.0/8`,
-  `169.254.169.254`).
+  `169.254.169.254`), including IPv4-mapped IPv6 forms (e.g. `::ffff:127.0.0.1`)
+  and the unspecified address (`0.0.0.0` / `::`).
 - **`endpoint.allow_private_network`** (default `false`) — per-endpoint opt-in
   required to deliver to a private address. An allowlist entry alone does **not**
   unlock a private address.
@@ -109,8 +110,8 @@ HTTPX does not follow redirects, so redirect-based bypasses are already closed.
 ## Configuration
 
 Run `bin/rails g angarium:install` to generate `config/initializers/angarium.rb`
-with all options: `job_queue`, `http_timeout`, `retry_schedule`,
-`signature_header`, and `block_private_ips`.
+with all options: `job_queue`, `http_timeout`, `open_timeout`, `user_agent`,
+`retry_schedule`, `signature_header`, and `block_private_ips`.
 
 ## License
 
