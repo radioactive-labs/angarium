@@ -60,9 +60,9 @@
   `429`/`502`/`504` and other non-2xx responses stay retryable with backoff and
   honor `Retry-After`; redirects are not followed.
 - Notification callbacks `config.on_delivery_exhausted` (delivery) and
-  `config.on_endpoint_disabled` (endpoint, reason: `:consecutive_failures` |
-  `:gone`) for alerting consumers out of band; a raised callback is logged and
-  swallowed.
+  `config.on_endpoint_deactivated` (endpoint, reason: `:consecutive_failures` ->
+  status `disabled`, or `:gone` -> status `gone`) for alerting consumers out of
+  band; a raised callback is logged and swallowed.
 - Honors a receiver's `Retry-After` header (seconds or HTTP-date) for the next
   attempt, capped by `config.max_retry_after` and toggleable via
   `config.respect_retry_after`.

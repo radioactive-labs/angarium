@@ -274,9 +274,10 @@ Angarium.configure do |config|
     AdminMailer.webhook_failed(delivery).deliver_later
   end
 
-  # An endpoint was disabled. reason is :consecutive_failures or :gone (HTTP 410).
-  config.on_endpoint_disabled = ->(endpoint, reason) do
-    AdminMailer.endpoint_disabled(endpoint, reason).deliver_later
+  # An endpoint was deactivated. reason is :consecutive_failures (status becomes
+  # `disabled`) or :gone (HTTP 410, status becomes `gone`).
+  config.on_endpoint_deactivated = ->(endpoint, reason) do
+    AdminMailer.endpoint_deactivated(endpoint, reason).deliver_later
   end
 end
 ```
@@ -583,7 +584,7 @@ with all options: `job_queue`, `http_timeout`, `open_timeout`, `user_agent`,
 `max_response_body_bytes`, `auto_disable_endpoint_after`, `respect_retry_after`,
 `max_retry_after`, `retry_jitter`, `signing_secret_grace_period`,
 `delivery_attempt_retention`, `delivering_timeout`, `on_delivery_exhausted`,
-and `on_endpoint_disabled`.
+and `on_endpoint_deactivated`.
 
 ### Primary keys
 

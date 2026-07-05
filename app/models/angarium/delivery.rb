@@ -124,7 +124,7 @@ module Angarium
     # mark this delivery terminal, with no retries.
     def handle_gone!
       update!(state: "gone", next_attempt_at: nil)
-      endpoint.disable!(reason: :gone)
+      endpoint.deactivate!(reason: :gone)
     end
 
     def handle_failure!(retry_after: nil)

@@ -242,13 +242,13 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     assert @endpoint.status_changed_at.present?
   end
 
-  test "410 Gone fires on_endpoint_disabled with reason :gone" do
-    disabled = []
-    with_config(:on_endpoint_disabled, ->(ep, reason) { disabled << [ep, reason] }) do
+  test "410 Gone fires on_endpoint_deactivated with reason :gone" do
+    deactivated = []
+    with_config(:on_endpoint_deactivated, ->(ep, reason) { deactivated << [ep, reason] }) do
       create_delivery.deliver!(client: gone_client)
     end
 
-    assert_equal [[@endpoint, :gone]], disabled
+    assert_equal [[@endpoint, :gone]], deactivated
   end
 
   test "exhausting a delivery fires on_delivery_exhausted" do
@@ -263,9 +263,9 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     assert exhausted.first.exhausted?
   end
 
-  test "auto-disable fires on_endpoint_disabled with reason :consecutive_failures" do
+  test "auto-disable fires on_endpoint_deactivated with reason :consecutive_failures" do
     reasons = []
-    with_config(:on_endpoint_disabled, ->(_ep, reason) { reasons << reason }) do
+    with_config(:on_endpoint_deactivated, ->(_ep, reason) { reasons << reason }) do
       Angarium.config.stub(:auto_disable_endpoint_after, 1) do
         Angarium.config.stub(:retry_schedule, []) do
           create_delivery.deliver!(client: failing_client)

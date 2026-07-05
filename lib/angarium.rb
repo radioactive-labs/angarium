@@ -30,7 +30,7 @@ module Angarium
     end
 
     # Invoke a configured notification callback (e.g. on_delivery_exhausted,
-    # on_endpoint_disabled). A callback raising must never break the delivery
+    # on_endpoint_deactivated). A callback raising must never break the delivery
     # pipeline, so errors are logged and swallowed.
     def notify(callback_name, *args)
       callback = config.public_send(callback_name)
