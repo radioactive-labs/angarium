@@ -14,6 +14,25 @@ module Angarium
       define_method("#{state_name}?") { state == state_name }
     end
 
+    # Recover deliveries stranded in "delivering": a worker set the state to
+    # "delivering" (in #deliver!) but died — crash, deploy, OOM — before
+    # recording the attempt or rescheduling, so the job's `pending?` guard never
+    # re-runs it. Anything still "delivering" whose last attempt started before
+    # `older_than.ago` is presumed abandoned and reset to "pending" + re-enqueued.
+    # Returns the number requeued. Keep `older_than` well above a single attempt's
+    # worst-case duration (open_timeout + http_timeout) so a live-but-slow worker
+    # isn't reaped; a redelivery is at-least-once-safe regardless.
+    def self.reap_stalled(older_than: Angarium.config.delivering_timeout)
+      return 0 unless older_than
+
+      ids = where(state: "delivering").where(last_attempt_at: ..older_than.ago).pluck(:id)
+      return 0 if ids.empty?
+
+      where(id: ids).update_all(state: "pending", next_attempt_at: Time.current, updated_at: Time.current)
+      ids.each { |id| DeliverJob.perform_later(id) }
+      ids.size
+    end
+
     # Performs one attempt. Records a DeliveryAttempt, then transitions to
     # succeeded, blocked (SSRF), schedules a retry, or exhausts. Returns the attempt.
     def deliver!(client: Client.new)

@@ -11,6 +11,9 @@ gem "minitest-mock"
 # Verify our Standard Webhooks signatures interoperate with the official library.
 gem "standardwebhooks"
 
+# Chaos-test the delivery job (interruption/idempotency).
+gem "chaotic_job"
+
 gem "puma"
 
 gem "sprockets-rails"

@@ -6,4 +6,10 @@ namespace :angarium do
     count = Angarium::DeliveryAttempt.prune(older_than: retention)
     puts "Angarium: pruned #{count} delivery attempt(s) older than #{retention.inspect}."
   end
+
+  desc "Requeue deliveries stuck in the delivering state past Angarium.config.delivering_timeout"
+  task reap: :environment do
+    count = Angarium::Delivery.reap_stalled
+    puts "Angarium: requeued #{count} stalled deliver(y/ies)."
+  end
 end

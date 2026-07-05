@@ -163,6 +163,37 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     assert_nil delivery.next_attempt_at
   end
 
+  # --- Reaping stalled deliveries ---------------------------------------------
+
+  test "reap_stalled requeues deliveries stuck in delivering past the timeout" do
+    delivery = create_delivery
+    delivery.update_columns(state: "delivering", last_attempt_at: 20.minutes.ago)
+
+    assert_enqueued_with(job: Angarium::DeliverJob) do
+      assert_equal 1, Angarium::Delivery.reap_stalled(older_than: 15.minutes)
+    end
+
+    delivery.reload
+    assert delivery.pending?
+    assert_not_nil delivery.next_attempt_at
+  end
+
+  test "reap_stalled leaves a fresh delivering delivery alone" do
+    delivery = create_delivery
+    delivery.update_columns(state: "delivering", last_attempt_at: 1.minute.ago)
+
+    assert_equal 0, Angarium::Delivery.reap_stalled(older_than: 15.minutes)
+    assert delivery.reload.delivering?
+  end
+
+  test "reap_stalled is a no-op when the timeout is nil" do
+    delivery = create_delivery
+    delivery.update_columns(state: "delivering", last_attempt_at: 1.year.ago)
+
+    assert_equal 0, Angarium::Delivery.reap_stalled(older_than: nil)
+    assert delivery.reload.delivering?
+  end
+
   # --- Test event -------------------------------------------------------------
 
   test "send_test_event! creates a delivery, enqueues, and delivers to the endpoint" do

@@ -3,7 +3,9 @@
 ## [0.1.0] - Unreleased
 
 ### Added
-- Mountable engine with `Angarium::Endpoint`, `Event`, `Delivery`, `DeliveryAttempt`.
+- Rails engine (headless) with `Angarium::Endpoint`, `Event`, `Delivery`, `DeliveryAttempt`.
+- `Angarium::Delivery.reap_stalled` + `angarium:reap` rake task to recover
+  deliveries stranded in `delivering` by a crashed worker (`config.delivering_timeout`).
 - `Angarium.dispatch` event fan-out to active, subscribed endpoints.
 - Webhook signatures follow the [Standard Webhooks](https://www.standardwebhooks.com)
   spec (`webhook-id`/`webhook-timestamp`/`webhook-signature` headers, `whsec_`

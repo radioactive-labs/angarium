@@ -195,6 +195,24 @@ deliveries after which an endpoint is automatically disabled (`active` → `fals
 count and resets to `0` on the next successful delivery. Left `nil` (the
 default), endpoints are never auto-disabled.
 
+### Recovering interrupted deliveries
+
+If a worker dies mid-delivery — crash, deploy, OOM — after a delivery is marked
+`delivering` but before the attempt is recorded or rescheduled, that delivery
+would otherwise be stranded (the job only re-runs `pending` deliveries). Requeue
+these with a periodic reaper:
+
+```ruby
+Angarium::Delivery.reap_stalled       # requeues deliveries stuck in `delivering`
+# or from cron/scheduler:  bin/rails angarium:reap
+```
+
+Anything `delivering` whose last attempt began more than
+`config.delivering_timeout` ago (default `15.minutes`) is presumed abandoned and
+reset to `pending`. Keep the timeout well above a single attempt's worst case
+(`open_timeout + http_timeout`) so a slow-but-alive worker isn't reaped; a
+redelivery is at-least-once-safe either way. Set it to `nil` to disable reaping.
+
 ### Sending a test event
 
 Verify an endpoint end-to-end by delivering a synthetic `angarium.test` event
@@ -273,8 +291,8 @@ Run `bin/rails g angarium:install` to generate `config/initializers/angarium.rb`
 with all options: `job_queue`, `http_timeout`, `open_timeout`, `user_agent`,
 `retry_schedule`, `block_private_ips`, `primary_key_type`,
 `max_response_body_bytes`, `auto_disable_endpoint_after`, `respect_retry_after`,
-`max_retry_after`, `retry_jitter`, `signing_secret_grace_period`, and
-`delivery_attempt_retention`.
+`max_retry_after`, `retry_jitter`, `signing_secret_grace_period`,
+`delivery_attempt_retention`, and `delivering_timeout`.
 
 ### Primary keys
 
