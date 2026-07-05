@@ -12,7 +12,10 @@ Angarium.configure do |config|
   # config.user_agent = "Angarium/#{Angarium::VERSION}"
 
   # Backoff schedule between retries. Length = number of retries.
-  # config.retry_schedule = [1.minute, 5.minutes, 30.minutes, 2.hours, 5.hours]
+  # Delays between retries (the first delivery is immediate). Standard Webhooks
+  # recommended default spans ~10 days; jitter is added per attempt.
+  # config.retry_schedule = [5.seconds, 5.minutes, 30.minutes, 2.hours, 5.hours,
+  #                          10.hours, 14.hours, 20.hours, 24.hours, 36.hours, 48.hours, 72.hours]
 
   # Reject endpoint URLs that resolve to private/loopback addresses (SSRF guard).
   # Per-endpoint overrides: endpoint.allow_private_network and endpoint.allowed_networks.

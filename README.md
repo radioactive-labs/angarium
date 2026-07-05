@@ -155,7 +155,9 @@ are rejected at validation (case-insensitively) and can't be overridden.
 ## Retries
 
 Failed deliveries (non-2xx or connection errors) are retried on the schedule in
-`config.retry_schedule` (default `[1m, 5m, 30m, 2h, 5h]` — five retries). Every
+`config.retry_schedule`. The default is the [Standard Webhooks](https://www.standardwebhooks.com)
+recommended schedule — twelve retries spanning ~10 days (`5s, 5m, 30m, 2h, 5h,
+10h, 14h, 20h, 24h, 36h, 48h, 72h`, after an immediate first delivery). Every
 attempt is recorded as an `Angarium::DeliveryAttempt`. After the schedule is
 exhausted the delivery is marked `exhausted`.
 
@@ -376,9 +378,9 @@ The specifics receivers use to decide whether to trust a webhook sender:
   delivery — but unique per *delivery*, not per event. Delivery is
   **at-least-once** — dedupe on that ID and treat repeats as no-ops.
 - **Retries with backoff, jitter, and `Retry-After`.** Failures (non-2xx,
-  timeouts, connection errors) retry on `config.retry_schedule` (default
-  `1m, 5m, 30m, 2h, 5h`), with +0–15% jitter; a receiver's `Retry-After` header
-  is honored (capped by `config.max_retry_after`).
+  timeouts, connection errors) retry on `config.retry_schedule` (default: the
+  Standard Webhooks schedule, twelve retries over ~10 days), with +0–15% jitter;
+  a receiver's `Retry-After` header is honored (capped by `config.max_retry_after`).
 - **Nothing is silently dropped.** When retries are exhausted the delivery is
   persisted in an `exhausted` state (not deleted), and every attempt is recorded
   as an `Angarium::DeliveryAttempt` (response code, body, error, duration).
