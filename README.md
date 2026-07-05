@@ -715,6 +715,32 @@ the same matrix across Ruby 3.2 and 3.3 (8 jobs). After changing a dependency or
 the `Appraisals` file, re-run `bundle exec appraisal install` and commit the
 updated `gemfiles/`.
 
+### Linting and security
+
+CI also runs [Standard](https://github.com/standardrb/standard) and
+[Brakeman](https://brakemanscanner.org):
+
+```bash
+bundle exec rake standard        # lint (rake standard:fix to autocorrect)
+bundle exec brakeman -q -z       # static security analysis
+```
+
+### Cutting a release
+
+Publishing runs from a laptop; CI only cuts the GitHub Release when the tag
+lands. Version math and the changelog come from [git-cliff](https://git-cliff.org)
+over your [Conventional Commits](https://www.conventionalcommits.org)
+(`brew install git-cliff`):
+
+```bash
+rake release:prepare        # bump version.rb + regenerate CHANGELOG.md, then STAGE (nothing committed)
+git diff --cached           # review
+rake release:publish        # commit, gem build + push, tag + push (idempotent/resumable)
+```
+
+`rake release:prepare[1.2.3]` forces a version instead of computing it. The bare
+`rake release` is disabled in favor of this two-step flow.
+
 ## License
 
 Angarium is released under the [MIT License](MIT-LICENSE).

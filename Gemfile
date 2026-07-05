@@ -22,3 +22,7 @@ gem "sprockets-rails"
 # gem "debug", ">= 1.0.0"
 
 gem "appraisal"
+
+# Linter / formatter and static security analysis.
+gem "standard"
+gem "brakeman"

@@ -6,6 +6,20 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    name: Lint & security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: Standard Ruby
+        run: bundle exec standardrb
+      - name: Brakeman
+        run: bundle exec brakeman -q --no-pager -z
+
   test:
     name: Ruby ${{ matrix.ruby }} / ${{ matrix.gemfile }}
     runs-on: ubuntu-latest
