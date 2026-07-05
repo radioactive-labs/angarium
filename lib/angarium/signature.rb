@@ -20,8 +20,8 @@ module Angarium
     def verify(secret:, request: nil, payload: nil, id: nil, timestamp: nil, signature: nil,
       tolerance: 300, now: Time.now.to_i)
       if request
-        payload   ||= request.raw_post
-        id        ||= request.headers["webhook-id"]
+        payload ||= request.raw_post
+        id ||= request.headers["webhook-id"]
         timestamp ||= request.headers["webhook-timestamp"]
         signature ||= request.headers["webhook-signature"]
       end

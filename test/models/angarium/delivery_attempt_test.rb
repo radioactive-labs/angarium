@@ -7,7 +7,7 @@ class Angarium::DeliveryAttemptTest < ActiveSupport::TestCase
       owner: @owner, name: "prod", url: "https://example.test/hook",
       signing_secret: "s3cr3t", subscribed_events: ["*"]
     )
-    @event = Angarium::Event.create!(name: "invoice.paid", payload: { id: 1 })
+    @event = Angarium::Event.create!(name: "invoice.paid", payload: {id: 1})
     @delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
   end
 
@@ -18,7 +18,7 @@ class Angarium::DeliveryAttemptTest < ActiveSupport::TestCase
   test "prune deletes attempts older than the cutoff and returns the count" do
     old_one = attempt_at(10.days.ago)
     old_two = attempt_at(3.days.ago)
-    recent  = attempt_at(1.hour.ago)
+    recent = attempt_at(1.hour.ago)
 
     deleted = Angarium::DeliveryAttempt.prune(older_than: 1.day)
 
@@ -30,7 +30,7 @@ class Angarium::DeliveryAttemptTest < ActiveSupport::TestCase
 
   test "prune accepts an absolute Time cutoff" do
     old_one = attempt_at(10.days.ago)
-    recent  = attempt_at(1.hour.ago)
+    recent = attempt_at(1.hour.ago)
 
     deleted = Angarium::DeliveryAttempt.prune(older_than: 2.days.ago)
 

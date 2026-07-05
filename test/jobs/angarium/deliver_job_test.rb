@@ -10,7 +10,7 @@ class Angarium::DeliverJobTest < ActiveSupport::TestCase
       owner: @owner, name: "e", url: "https://203.0.113.10/hook",
       signing_secret: "shh", subscribed_events: ["*"]
     )
-    @event = Angarium::Event.create!(name: "invoice.paid", payload: { "id" => 1 })
+    @event = Angarium::Event.create!(name: "invoice.paid", payload: {"id" => 1})
   end
 
   test "creating a delivery enqueues the deliver job" do
@@ -55,7 +55,7 @@ class Angarium::DeliverJobTest < ActiveSupport::TestCase
 
     envelope = JSON.parse(call.body)
     assert_equal "invoice.paid", envelope["event"]
-    assert_equal({ "id" => 1 }, envelope["data"])
+    assert_equal({"id" => 1}, envelope["data"])
     assert envelope["id"].present?
 
     assert Angarium::Signature.verify(
@@ -100,7 +100,7 @@ class Angarium::DeliverJobTest < ActiveSupport::TestCase
     capturing = Class.new do
       attr_reader :captured
       def post(url, body:, headers:, addresses: nil)
-        @captured = { url: url, addresses: addresses }
+        @captured = {url: url, addresses: addresses}
         Angarium::Client::Result.new(success: true, code: 200, body: "ok", duration: 0.0)
       end
     end.new

@@ -2,7 +2,7 @@ require "test_helper"
 require "ipaddr"
 
 class Angarium::AddressPolicyTest < ActiveSupport::TestCase
-  Endpoint = Struct.new(:allow_private_network, :allowed_networks, keyword_init: true)
+  Endpoint = Struct.new(:allow_private_network, :allowed_networks)
 
   def endpoint(allow_private_network: false, allowed_networks: [])
     Endpoint.new(allow_private_network:, allowed_networks:)

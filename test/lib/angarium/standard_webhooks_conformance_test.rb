@@ -33,7 +33,7 @@ class Angarium::StandardWebhooksConformanceTest < ActiveSupport::TestCase
 
   # Run the real pipeline for one event and return the captured Client call
   # (the exact body + headers Angarium put on the wire).
-  def deliver!(event = "conformance.test", payload = { "hello" => "world" })
+  def deliver!(event = "conformance.test", payload = {"hello" => "world"})
     result = Angarium::Client::Result.new(success: true, code: 200, body: "", headers: {})
     fake = FakeAngariumClient.new(result)
     Angarium::Client.stub(:new, fake) do
@@ -60,7 +60,7 @@ class Angarium::StandardWebhooksConformanceTest < ActiveSupport::TestCase
     assert_nothing_raised { verifier(@endpoint.signing_secret).verify(call.body, sw_headers(call)) }
     envelope = JSON.parse(call.body)
     assert_equal "conformance.test", envelope["event"]
-    assert_equal({ "hello" => "world" }, envelope["data"])
+    assert_equal({"hello" => "world"}, envelope["data"])
   end
 
   test "webhook-id header equals the envelope id" do
@@ -70,7 +70,7 @@ class Angarium::StandardWebhooksConformanceTest < ActiveSupport::TestCase
   end
 
   test "signs the raw bytes: a non-ASCII payload still verifies" do
-    call = deliver!("conformance.unicode", { "note" => "héllo — ünïcode ✓" })
+    call = deliver!("conformance.unicode", {"note" => "héllo — ünïcode ✓"})
     assert_nothing_raised { verifier(@endpoint.signing_secret).verify(call.body, sw_headers(call)) }
   end
 

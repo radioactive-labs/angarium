@@ -14,7 +14,7 @@ module Angarium
       def show
         delivery = scoped_delivery(params[:id])
         authorize!(delivery)
-        render json: { delivery: delivery_json(delivery) }
+        render json: {delivery: delivery_json(delivery)}
       end
 
       # POST /deliveries/:id/redeliver
@@ -22,7 +22,7 @@ module Angarium
         delivery = scoped_delivery(params[:id])
         authorize!(delivery)
         delivery.redeliver!
-        render json: { delivery: delivery_json(delivery) }, status: :accepted
+        render json: {delivery: delivery_json(delivery)}, status: :accepted
       end
     end
   end

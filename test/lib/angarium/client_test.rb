@@ -25,7 +25,7 @@ class Angarium::ClientTest < ActiveSupport::TestCase
 
   test "populates downcased response headers on success" do
     stub_request(:post, "https://example.test/hook")
-      .to_return(status: 200, body: "ok", headers: { "Retry-After" => "30", "Content-Type" => "text/plain" })
+      .to_return(status: 200, body: "ok", headers: {"Retry-After" => "30", "Content-Type" => "text/plain"})
 
     result = Angarium::Client.new.post("https://example.test/hook", body: "{}", headers: {})
     assert_equal "30", result.headers["retry-after"]

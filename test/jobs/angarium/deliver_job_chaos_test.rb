@@ -14,7 +14,7 @@ class Angarium::DeliverJobChaosTest < ActiveSupport::TestCase
     @endpoint = Angarium::Endpoint.create!(
       owner: @owner, name: "e", url: "https://203.0.113.10/hook", subscribed_events: ["*"]
     )
-    @event = Angarium::Event.create!(name: "invoice.paid", payload: { "id" => 1 })
+    @event = Angarium::Event.create!(name: "invoice.paid", payload: {"id" => 1})
   end
 
   test "a worker killed after the POST leaves the delivery recoverable by the reaper" do

@@ -1,14 +1,14 @@
 require_relative "lib/angarium/version"
 
 Gem::Specification.new do |spec|
-  spec.name        = "angarium"
-  spec.version     = Angarium::VERSION
-  spec.authors     = ["TheDumbTechGuy"]
-  spec.email       = ["sfroelich01@gmail.com"]
-  spec.homepage    = "https://github.com/radioactive-labs/angarium"
-  spec.summary     = "Outbound webhooks for Rails: signed, retried, subscription-based delivery."
+  spec.name = "angarium"
+  spec.version = Angarium::VERSION
+  spec.authors = ["TheDumbTechGuy"]
+  spec.email = ["sfroelich01@gmail.com"]
+  spec.homepage = "https://github.com/radioactive-labs/angarium"
+  spec.summary = "Outbound webhooks for Rails: signed, retried, subscription-based delivery."
   spec.description = "A mountable Rails engine that delivers outbound webhooks with HMAC signing, automatic retries with exponential backoff, and per-endpoint event subscriptions."
-  spec.license     = "MIT"
+  spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2"
 
   # Set to a private/paid gem host if selling through one; keep rubygems.org for public release.

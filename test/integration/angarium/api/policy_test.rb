@@ -35,7 +35,7 @@ class Angarium::Api::PolicyTest < ActionDispatch::IntegrationTest
     )
   end
 
-  def auth = { "X-Owner-Id" => @owner.id.to_s }
+  def auth = {"X-Owner-Id" => @owner.id.to_s}
 
   test "policy permits reads and forbids writes and member actions" do
     Angarium.config.stub(:policy_class, "ReadOnlyPolicy") do
@@ -43,11 +43,11 @@ class Angarium::Api::PolicyTest < ActionDispatch::IntegrationTest
       assert_response :ok
 
       post "/angarium/endpoints",
-        params: { endpoint: { name: "n", url: "https://203.0.113.20/h" } }, headers: auth, as: :json
+        params: {endpoint: {name: "n", url: "https://203.0.113.20/h"}}, headers: auth, as: :json
       assert_response :forbidden
 
       patch "/angarium/endpoints/#{@endpoint.id}",
-        params: { endpoint: { name: "x" } }, headers: auth, as: :json
+        params: {endpoint: {name: "x"}}, headers: auth, as: :json
       assert_response :forbidden
 
       delete "/angarium/endpoints/#{@endpoint.id}", headers: auth
@@ -69,12 +69,12 @@ class Angarium::Api::PolicyTest < ActionDispatch::IntegrationTest
   test "owner and create? together gate acting on behalf of another owner" do
     Angarium.config.stub(:policy_class, "DelegateOwnOnlyPolicy") do
       post "/angarium/endpoints",
-        params: { owner_id: @other.id, endpoint: { name: "n", url: "https://203.0.113.20/h" } },
+        params: {owner_id: @other.id, endpoint: {name: "n", url: "https://203.0.113.20/h"}},
         headers: auth, as: :json
       assert_response :forbidden, "creating for another owner should be denied"
 
       post "/angarium/endpoints",
-        params: { owner_id: @owner.id, endpoint: { name: "n", url: "https://203.0.113.21/h" } },
+        params: {owner_id: @owner.id, endpoint: {name: "n", url: "https://203.0.113.21/h"}},
         headers: auth, as: :json
       assert_response :created, "creating for yourself should be allowed"
     end

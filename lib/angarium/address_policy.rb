@@ -46,7 +46,7 @@ module Angarium
       return [literal] if literal
 
       Resolv.getaddresses(host).filter_map { |a| to_ipaddr(a) }
-    rescue StandardError
+    rescue
       []
     end
 
@@ -62,7 +62,7 @@ module Angarium
     # above see the real address; leave other addresses untouched.
     def normalize(ip)
       ip.respond_to?(:native) ? ip.native : ip
-    rescue StandardError
+    rescue
       ip
     end
 

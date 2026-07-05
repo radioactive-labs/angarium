@@ -7,12 +7,12 @@ class Angarium::Api::DeliveriesTest < ActionDispatch::IntegrationTest
     @endpoint = @owner.webhook_endpoints.create!(
       name: "e", url: "https://203.0.113.10/h", subscribed_events: ["*"]
     )
-    @event = Angarium::Event.create!(name: "invoice.paid", payload: { "id" => 1 })
+    @event = Angarium::Event.create!(name: "invoice.paid", payload: {"id" => 1})
     @delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
     @attempt = @delivery.delivery_attempts.create!(response_code: 500, error: "boom", duration: 0.1)
   end
 
-  def auth(owner) = { "X-Owner-Id" => owner.id.to_s }
+  def auth(owner) = {"X-Owner-Id" => owner.id.to_s}
 
   test "lists deliveries for an endpoint in scope" do
     get "/angarium/endpoints/#{@endpoint.id}/deliveries", headers: auth(@owner)
@@ -38,7 +38,7 @@ class Angarium::Api::DeliveriesTest < ActionDispatch::IntegrationTest
   test "list responses advertise pagination" do
     get "/angarium/deliveries/#{@delivery.id}/attempts?limit=1", headers: auth(@owner)
     assert_response :ok
-    assert_equal({ "limit" => 1, "offset" => 0, "count" => 1, "total" => 1 },
+    assert_equal({"limit" => 1, "offset" => 0, "count" => 1, "total" => 1},
       JSON.parse(response.body)["pagination"])
   end
 

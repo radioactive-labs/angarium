@@ -24,7 +24,7 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     )
   end
 
-  def auth(owner) = { "X-Owner-Id" => owner.id.to_s }
+  def auth(owner) = {"X-Owner-Id" => owner.id.to_s}
 
   test "requires authentication" do
     get "/angarium/endpoints"
@@ -49,7 +49,7 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     assert_response :ok
     body = JSON.parse(response.body)
     assert_equal 2, body["endpoints"].size
-    assert_equal({ "limit" => 2, "offset" => 1, "count" => 2, "total" => 3 }, body["pagination"])
+    assert_equal({"limit" => 2, "offset" => 1, "count" => 2, "total" => 3}, body["pagination"])
   end
 
   test "show finds within scope and 404s across scope" do
@@ -63,7 +63,7 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
   test "create owns to the current user by default and reveals the secret once" do
     assert_difference -> { @owner.webhook_endpoints.count }, 1 do
       post "/angarium/endpoints",
-        params: { endpoint: { name: "New", url: "https://203.0.113.20/hook", subscribed_events: ["invoice.*"] } },
+        params: {endpoint: {name: "New", url: "https://203.0.113.20/hook", subscribed_events: ["invoice.*"]}},
         headers: auth(@owner), as: :json
     end
     assert_response :created
@@ -75,8 +75,8 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
   test "a policy's owner can create on behalf of another owner" do
     Angarium.config.stub(:policy_class, "DelegatingPolicy") do
       post "/angarium/endpoints",
-        params: { owner_id: @other.id,
-                  endpoint: { name: "Deleg", url: "https://203.0.113.40/hook", subscribed_events: ["*"] } },
+        params: {owner_id: @other.id,
+                 endpoint: {name: "Deleg", url: "https://203.0.113.40/hook", subscribed_events: ["*"]}},
         headers: auth(@owner), as: :json
     end
     assert_response :created
@@ -85,7 +85,7 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
 
   test "changing a forbidden network control is a loud 422, not a silent drop" do
     patch "/angarium/endpoints/#{@endpoint.id}",
-      params: { endpoint: { allow_private_network: true } }, headers: auth(@owner), as: :json
+      params: {endpoint: {allow_private_network: true}}, headers: auth(@owner), as: :json
     assert_response :unprocessable_entity
     assert_match "allow_private_network", JSON.parse(response.body)["details"].join
     refute @endpoint.reload.allow_private_network
@@ -93,7 +93,7 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
 
   test "echoing a forbidden network control at its current value is a no-op" do
     patch "/angarium/endpoints/#{@endpoint.id}",
-      params: { endpoint: { name: "Renamed", allow_private_network: false } },
+      params: {endpoint: {name: "Renamed", allow_private_network: false}},
       headers: auth(@owner), as: :json
     assert_response :ok
     assert_equal "Renamed", @endpoint.reload.name
@@ -102,13 +102,13 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
   test "permit_allow_private_network? gates only the private-network relaxation" do
     Angarium.config.stub(:policy_class, "PrivateNetworkPolicy") do
       patch "/angarium/endpoints/#{@endpoint.id}",
-        params: { endpoint: { allow_private_network: true } }, headers: auth(@owner), as: :json
+        params: {endpoint: {allow_private_network: true}}, headers: auth(@owner), as: :json
       assert_response :ok
       assert @endpoint.reload.allow_private_network
 
       # allowed_networks stays gated by its own predicate.
       patch "/angarium/endpoints/#{@endpoint.id}",
-        params: { endpoint: { allowed_networks: ["203.0.113.0/24"] } }, headers: auth(@owner), as: :json
+        params: {endpoint: {allowed_networks: ["203.0.113.0/24"]}}, headers: auth(@owner), as: :json
       assert_response :unprocessable_entity
     end
   end
@@ -117,26 +117,26 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     Angarium.config.stub(:policy_class, "AllowlistPolicy") do
       # 203.0.113.0/24 includes the endpoint's own address, so it stays valid.
       patch "/angarium/endpoints/#{@endpoint.id}",
-        params: { endpoint: { allowed_networks: ["203.0.113.0/24"] } }, headers: auth(@owner), as: :json
+        params: {endpoint: {allowed_networks: ["203.0.113.0/24"]}}, headers: auth(@owner), as: :json
       assert_response :ok
       assert_equal ["203.0.113.0/24"], @endpoint.reload.allowed_networks
 
       # allow_private_network stays gated by its own predicate.
       patch "/angarium/endpoints/#{@endpoint.id}",
-        params: { endpoint: { allow_private_network: true } }, headers: auth(@owner), as: :json
+        params: {endpoint: {allow_private_network: true}}, headers: auth(@owner), as: :json
       assert_response :unprocessable_entity
     end
   end
 
   test "create with invalid params returns 422 with details" do
-    post "/angarium/endpoints", params: { endpoint: { url: "" } }, headers: auth(@owner), as: :json
+    post "/angarium/endpoints", params: {endpoint: {url: ""}}, headers: auth(@owner), as: :json
     assert_response :unprocessable_entity
     assert JSON.parse(response.body)["details"].present?
   end
 
   test "update changes attributes" do
     patch "/angarium/endpoints/#{@endpoint.id}",
-      params: { endpoint: { name: "Renamed" } }, headers: auth(@owner), as: :json
+      params: {endpoint: {name: "Renamed"}}, headers: auth(@owner), as: :json
     assert_response :ok
     assert_equal "Renamed", @endpoint.reload.name
   end

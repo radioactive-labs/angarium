@@ -17,8 +17,8 @@ class Angarium::DispatchTest < ActiveSupport::TestCase
   test "creates an event and a delivery per matching endpoint" do
     event = nil
     assert_difference -> { Angarium::Event.count } => 1,
-                      -> { Angarium::Delivery.count } => 1 do
-      event = Angarium.dispatch("invoice.paid", { id: 1 }, owner: @owner)
+      -> { Angarium::Delivery.count } => 1 do
+      event = Angarium.dispatch("invoice.paid", {id: 1}, owner: @owner)
     end
     assert_equal "invoice.paid", event.name
     assert_equal [@subscribed], event.deliveries.map(&:endpoint)

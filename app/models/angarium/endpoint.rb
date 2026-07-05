@@ -24,7 +24,7 @@ module Angarium
     #   paused:   turned off manually (resumable via #enable!)
     #   disabled: auto-disabled after too many consecutive failures (resumable)
     #   gone:     the receiver returned HTTP 410; treat as terminal
-    enum :status, { enabled: "enabled", paused: "paused", disabled: "disabled", gone: "gone" },
+    enum :status, {enabled: "enabled", paused: "paused", disabled: "disabled", gone: "gone"},
       default: :enabled
 
     # Rails < 8.1's SQLite adapter doesn't parse the `DEFAULT FALSE` literal
@@ -114,7 +114,7 @@ module Angarium
     # subscription matching (a ping is always sent). Returns the created
     # Angarium::Delivery, whose after_create_commit enqueues the DeliverJob;
     # reload it to inspect the outcome.
-    def ping!(payload = { message: "Angarium ping" })
+    def ping!(payload = {message: "Angarium ping"})
       event = Angarium::Event.create!(name: "angarium.ping", payload: payload)
       deliveries.create!(event: event)
     end

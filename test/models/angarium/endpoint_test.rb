@@ -47,7 +47,7 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
   end
 
   test "custom_headers is encrypted at rest (may carry a bearer token) and decrypts transparently" do
-    endpoint = build(custom_headers: { "Authorization" => "Bearer s3kret" }).tap(&:save!)
+    endpoint = build(custom_headers: {"Authorization" => "Bearer s3kret"}).tap(&:save!)
 
     raw = ActiveRecord::Base.connection_pool.with_connection do |c|
       c.select_value("SELECT custom_headers FROM angarium_endpoints WHERE id = #{endpoint.id}")
@@ -55,7 +55,7 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     refute_includes raw.to_s, "Bearer s3kret", "the bearer token must not be stored in plaintext"
     assert_includes raw.to_s, "\"p\":", "expected Active Record Encryption envelope in the DB"
 
-    assert_equal({ "Authorization" => "Bearer s3kret" }, endpoint.reload.custom_headers,
+    assert_equal({"Authorization" => "Bearer s3kret"}, endpoint.reload.custom_headers,
       "must decrypt transparently on read")
   end
 
@@ -145,36 +145,36 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
   end
 
   test "accepts a string=>string custom_headers hash and an empty default" do
-    assert build(custom_headers: { "Authorization" => "Bearer x" }).valid?
+    assert build(custom_headers: {"Authorization" => "Bearer x"}).valid?
     assert build.valid?
   end
 
   test "rejects custom_headers with non-string keys or values" do
-    endpoint = build(custom_headers: { "X-Count" => 3 })
+    endpoint = build(custom_headers: {"X-Count" => 3})
     refute endpoint.valid?
     assert_includes endpoint.errors[:custom_headers].join, "hash of string keys and values"
   end
 
   test "rejects custom_headers that override a transport header" do
-    endpoint = build(custom_headers: { "Content-Type" => "text/plain" })
+    endpoint = build(custom_headers: {"Content-Type" => "text/plain"})
     refute endpoint.valid?
     assert_includes endpoint.errors[:custom_headers].join, "reserved or transport headers"
   end
 
   test "rejects custom_headers that override a signature header" do
-    endpoint = build(custom_headers: { "webhook-signature" => "x" })
+    endpoint = build(custom_headers: {"webhook-signature" => "x"})
     refute endpoint.valid?
     assert_includes endpoint.errors[:custom_headers].join, "reserved or transport headers"
   end
 
   test "reserved custom_headers denylist is case-insensitive" do
-    endpoint = build(custom_headers: { "HOST" => "evil" })
+    endpoint = build(custom_headers: {"HOST" => "evil"})
     refute endpoint.valid?
     assert_includes endpoint.errors[:custom_headers].join, "reserved or transport headers"
   end
 
   test "allows a normal custom_headers entry alongside the denylist" do
-    assert build(custom_headers: { "Authorization" => "Bearer x" }).valid?
+    assert build(custom_headers: {"Authorization" => "Bearer x"}).valid?
   end
 
   test "rotate_secret! records the previous secret and rotation time" do

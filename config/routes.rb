@@ -2,7 +2,7 @@ Angarium::Engine.routes.draw do
   # Headless JSON API. Mount the engine in your app's routes, e.g.
   #   mount Angarium::Engine => "/webhooks"
   # yielding /webhooks/endpoints, /webhooks/deliveries/:id, etc.
-  scope module: :api, defaults: { format: :json } do
+  scope module: :api, defaults: {format: :json} do
     resources :endpoints, only: %i[index show create update destroy] do
       member do
         post :rotate_secret

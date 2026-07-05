@@ -10,7 +10,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
       owner: @owner, name: "e", url: "https://203.0.113.10/hook",
       signing_secret: "shh", subscribed_events: ["*"]
     )
-    @event = Angarium::Event.create!(name: "invoice.paid", payload: { "id" => 1 })
+    @event = Angarium::Event.create!(name: "invoice.paid", payload: {"id" => 1})
   end
 
   def create_delivery
@@ -32,7 +32,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
   # --- Custom headers ---------------------------------------------------------
 
   test "delivery sends per-endpoint custom headers" do
-    @endpoint.update!(custom_headers: { "Authorization" => "Bearer x" })
+    @endpoint.update!(custom_headers: {"Authorization" => "Bearer x"})
     fake = succeeding_client
     create_delivery.deliver!(client: fake)
 
@@ -45,7 +45,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     # bypass validation here (still writing through the encrypted attribute) to
     # prove the delivery-time defense (signature always wins) holds even if such
     # a header reached the row some other way.
-    @endpoint.custom_headers = { "webhook-signature" => "evil" }
+    @endpoint.custom_headers = {"webhook-signature" => "evil"}
     @endpoint.save!(validate: false)
     fake = succeeding_client
     delivery = create_delivery
@@ -68,7 +68,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
   test "respects a numeric Retry-After header" do
     freeze_time do
       Angarium.config.stub(:retry_schedule, [60]) do
-        create_delivery.deliver!(client: failing_client(headers: { "retry-after" => "120" }))
+        create_delivery.deliver!(client: failing_client(headers: {"retry-after" => "120"}))
       end
       delivery = Angarium::Delivery.last
       assert delivery.pending?
@@ -79,7 +79,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
   test "respects an HTTP-date Retry-After header" do
     freeze_time do
       Angarium.config.stub(:retry_schedule, [60]) do
-        create_delivery.deliver!(client: failing_client(headers: { "retry-after" => (Time.now + 90).httpdate }))
+        create_delivery.deliver!(client: failing_client(headers: {"retry-after" => (Time.now + 90).httpdate}))
       end
       delivery = Angarium::Delivery.last
       assert delivery.pending?
@@ -90,7 +90,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
   test "clamps a Retry-After above max_retry_after" do
     freeze_time do
       Angarium.config.stub(:retry_schedule, [60]) do
-        create_delivery.deliver!(client: failing_client(headers: { "retry-after" => "999999" }))
+        create_delivery.deliver!(client: failing_client(headers: {"retry-after" => "999999"}))
       end
       delivery = Angarium::Delivery.last
       assert_in_delta Time.current + Angarium.config.max_retry_after, delivery.next_attempt_at, 1
@@ -100,7 +100,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
   test "ignores a Retry-After sooner than the scheduled backoff (no expedited retries)" do
     freeze_time do
       Angarium.config.stub(:retry_schedule, [300]) do
-        create_delivery.deliver!(client: failing_client(headers: { "retry-after" => "10" }))
+        create_delivery.deliver!(client: failing_client(headers: {"retry-after" => "10"}))
       end
       delivery = Angarium::Delivery.last
       assert delivery.pending?
@@ -115,7 +115,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     freeze_time do
       Angarium.config.stub(:respect_retry_after, false) do
         Angarium.config.stub(:retry_schedule, [60]) do
-          create_delivery.deliver!(client: failing_client(headers: { "retry-after" => "120" }))
+          create_delivery.deliver!(client: failing_client(headers: {"retry-after" => "120"}))
         end
       end
       delivery = Angarium::Delivery.last

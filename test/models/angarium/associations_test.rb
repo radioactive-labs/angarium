@@ -7,7 +7,7 @@ class Angarium::AssociationsTest < ActiveSupport::TestCase
       owner: @owner, name: "prod", url: "https://example.test/hook",
       signing_secret: "s3cr3t", subscribed_events: ["*"]
     )
-    @event = Angarium::Event.create!(name: "invoice.paid", payload: { id: 1 })
+    @event = Angarium::Event.create!(name: "invoice.paid", payload: {id: 1})
     @delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
     @attempt = Angarium::DeliveryAttempt.create!(delivery: @delivery, response_code: 200)
   end

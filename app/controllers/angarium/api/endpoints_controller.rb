@@ -10,7 +10,7 @@ module Angarium
 
       def show
         authorize!(@endpoint)
-        render json: { endpoint: endpoint_json(@endpoint) }
+        render json: {endpoint: endpoint_json(@endpoint)}
       end
 
       def create
@@ -21,13 +21,13 @@ module Angarium
         authorize!(endpoint)
         endpoint.save!
         # The signing secret is revealed once, on creation.
-        render json: { endpoint: endpoint_json(endpoint, include_secret: true) }, status: :created
+        render json: {endpoint: endpoint_json(endpoint, include_secret: true)}, status: :created
       end
 
       def update
         authorize!(@endpoint)
         @endpoint.update!(endpoint_params)
-        render json: { endpoint: endpoint_json(@endpoint) }
+        render json: {endpoint: endpoint_json(@endpoint)}
       end
 
       def destroy
@@ -39,25 +39,25 @@ module Angarium
       def rotate_secret
         authorize!(@endpoint)
         secret = @endpoint.rotate_secret!
-        render json: { endpoint: endpoint_json(@endpoint), signing_secret: secret }
+        render json: {endpoint: endpoint_json(@endpoint), signing_secret: secret}
       end
 
       def pause
         authorize!(@endpoint)
         @endpoint.pause!
-        render json: { endpoint: endpoint_json(@endpoint) }
+        render json: {endpoint: endpoint_json(@endpoint)}
       end
 
       def enable
         authorize!(@endpoint)
         @endpoint.enable!
-        render json: { endpoint: endpoint_json(@endpoint) }
+        render json: {endpoint: endpoint_json(@endpoint)}
       end
 
       def ping
         authorize!(@endpoint)
         delivery = @endpoint.ping!
-        render json: { delivery: delivery_json(delivery) }, status: :accepted
+        render json: {delivery: delivery_json(delivery)}, status: :accepted
       end
 
       private

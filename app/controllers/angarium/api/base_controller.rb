@@ -60,12 +60,12 @@ module Angarium
         records = relation.limit(limit).offset(offset).to_a
         render json: {
           key => records.map(&serializer),
-          pagination: { limit: limit, offset: offset, count: records.size, total: relation.count }
+          :pagination => {limit: limit, offset: offset, count: records.size, total: relation.count}
         }
       end
 
       def render_error(status, message, **extra)
-        render json: { error: message, **extra }, status: status
+        render json: {error: message, **extra}, status: status
       end
 
       def angarium_render_unauthorized = render_error(:unauthorized, "authentication required")

@@ -110,7 +110,7 @@ class Angarium::SignatureTest < ActiveSupport::TestCase
   # A stand-in for a Rails request: responds to raw_post and headers[...].
   def fake_request(body, id:, timestamp:, signature:)
     Struct.new(:raw_post, :headers).new(
-      body, { "webhook-id" => id, "webhook-timestamp" => timestamp.to_s, "webhook-signature" => signature }
+      body, {"webhook-id" => id, "webhook-timestamp" => timestamp.to_s, "webhook-signature" => signature}
     )
   end
 
