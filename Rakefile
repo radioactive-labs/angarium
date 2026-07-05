@@ -7,5 +7,7 @@ load "rails/tasks/statistics.rake"
 
 require "bundler/gem_tasks"
 
-# `rake standard` / `rake standard:fix`. Release tasks live in rakelib/ (auto-loaded).
-require "standard/rake"
+# `rake standard` / `rake standard:fix` when the linter is in the bundle (dev).
+# `bin/rails test` loads this Rakefile too, and the test-matrix bundles omit
+# standard, so only require it when present. Release tasks live in rakelib/.
+require "standard/rake" if Gem.loaded_specs.key?("standard")
