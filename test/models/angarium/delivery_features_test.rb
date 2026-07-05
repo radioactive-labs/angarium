@@ -297,7 +297,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
 
   test "within the grace window a delivery verifies with both old and new secrets" do
     old_secret = @endpoint.signing_secret
-    new_secret = @endpoint.rotate_signing_secret!
+    new_secret = @endpoint.rotate_secret!
     refute_equal old_secret, new_secret
 
     fake = succeeding_client
@@ -320,7 +320,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
 
   test "past the grace window only the new secret verifies" do
     old_secret = @endpoint.signing_secret
-    new_secret = @endpoint.rotate_signing_secret!
+    new_secret = @endpoint.rotate_secret!
     @endpoint.update!(secret_rotated_at: 2.days.ago)
 
     fake = succeeding_client

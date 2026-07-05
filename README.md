@@ -143,7 +143,7 @@ plaintext, so deliver it to receivers over a secure channel.
 
 ### Rotating a signing secret (zero-downtime)
 
-Rotate a secret with `endpoint.rotate_signing_secret!` (returns the new
+Rotate a secret with `endpoint.rotate_secret!` (returns the new
 plaintext). During a grace window (`config.signing_secret_grace_period`, default
 `24.hours`) every delivery is signed with **both** the new and the previous
 secret. The `webhook-signature` header carries multiple space-delimited `v1,`

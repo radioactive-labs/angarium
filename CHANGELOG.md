@@ -38,7 +38,7 @@
 - Endpoint `signing_secret` and `custom_headers` are encrypted at rest with
   Active Record Encryption (custom_headers commonly carries a receiver credential
   such as a bearer token). Requires the host app to configure encryption keys.
-- `Endpoint#rotate_signing_secret!` to rotate an endpoint's signing secret.
+- `Endpoint#rotate_secret!` to rotate an endpoint's signing secret.
 - Endpoint URL/SSRF validation re-runs when `url`, `allow_private_network`, or
   `allowed_networks` change (and skips the DNS lookup on unrelated updates).
 - Configurable `config.primary_key_type` for Angarium's own tables (defaults
@@ -72,7 +72,7 @@
   subscription matching; returns the `Angarium::Delivery`.
 - Additive positive backoff jitter (`config.retry_jitter`) to avoid retry
   stampedes.
-- Dual-secret rotation grace: after `rotate_signing_secret!`, deliveries are
+- Dual-secret rotation grace: after `rotate_secret!`, deliveries are
   signed with both the new and previous secret for
   `config.signing_secret_grace_period`, and `Signature.verify` accepts any
   signature in the header, enabling zero-downtime secret rollover.

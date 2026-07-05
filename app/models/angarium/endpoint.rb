@@ -68,7 +68,7 @@ module Angarium
     # The previous secret stays valid for `config.signing_secret_grace_period`
     # (deliveries are signed with both during that window), so receivers can
     # roll over to the new secret with zero downtime.
-    def rotate_signing_secret!
+    def rotate_secret!
       update!(
         previous_signing_secret: signing_secret,
         signing_secret: self.class.generate_signing_secret,

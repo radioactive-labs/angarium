@@ -92,7 +92,7 @@ class Angarium::StandardWebhooksConformanceTest < ActiveSupport::TestCase
 
   test "dual-signs during the rotation grace window: both secrets verify" do
     old_secret = @endpoint.signing_secret
-    new_secret = @endpoint.rotate_signing_secret!
+    new_secret = @endpoint.rotate_secret!
 
     call = deliver!("conformance.rotated")
     headers = sw_headers(call)
@@ -106,7 +106,7 @@ class Angarium::StandardWebhooksConformanceTest < ActiveSupport::TestCase
 
   test "signs with only the new secret after the grace period" do
     old_secret = @endpoint.signing_secret
-    new_secret = @endpoint.rotate_signing_secret!
+    new_secret = @endpoint.rotate_secret!
 
     # The grace cutoff is evaluated at signing time (active_signing_secrets checks
     # secret_rotated_at > grace_period.ago), so traveling past the window flips it.

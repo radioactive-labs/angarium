@@ -38,7 +38,7 @@ module Angarium
 
       def rotate_secret
         authorize!(@endpoint)
-        secret = @endpoint.rotate_signing_secret!
+        secret = @endpoint.rotate_secret!
         render json: { endpoint: endpoint_json(@endpoint), signing_secret: secret }
       end
 
