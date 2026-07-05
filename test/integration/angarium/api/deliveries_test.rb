@@ -20,13 +20,13 @@ class Angarium::Api::DeliveriesTest < ActionDispatch::IntegrationTest
     assert_includes JSON.parse(response.body)["deliveries"].map { |d| d["id"] }, @delivery.id
   end
 
-  test "shows a delivery with its attempts" do
+  test "shows a delivery (attempts are a separate endpoint)" do
     get "/angarium/deliveries/#{@delivery.id}", headers: auth(@owner)
     assert_response :ok
     body = JSON.parse(response.body)
     assert_equal @delivery.id, body["delivery"]["id"]
     assert_equal "invoice.paid", body["delivery"]["event"]
-    assert_equal [@attempt.id], body["attempts"].map { |a| a["id"] }
+    refute body.key?("attempts"), "show should not embed attempts; use /attempts"
   end
 
   test "lists a delivery's attempts" do

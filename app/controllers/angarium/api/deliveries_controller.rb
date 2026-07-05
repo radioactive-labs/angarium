@@ -10,13 +10,12 @@ module Angarium
       end
 
       # GET /deliveries/:id
+      # Attempts are fetched separately (and paginated) via
+      # GET /deliveries/:id/attempts.
       def show
         delivery = scoped_delivery(params[:id])
         authorize!(delivery)
-        render json: {
-          delivery: delivery_json(delivery),
-          attempts: delivery.delivery_attempts.order(created_at: :desc).map { |a| attempt_json(a) }
-        }
+        render json: { delivery: delivery_json(delivery) }
       end
 
       # POST /deliveries/:id/redeliver

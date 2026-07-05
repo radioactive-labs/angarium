@@ -440,7 +440,7 @@ included (see the note below):
 | `POST /endpoints/:id/pause`, `/enable` | none | `200 { "endpoint": endpoint }` |
 | `POST /endpoints/:id/ping` | none | `202 { "delivery": delivery }` |
 | `GET /endpoints/:id/deliveries` | none | `200 { "deliveries": [delivery, ...] }` |
-| `GET /deliveries/:id` | none | `200 { "delivery": delivery, "attempts": [attempt, ...] }` |
+| `GET /deliveries/:id` | none | `200 { "delivery": delivery }` |
 | `POST /deliveries/:id/redeliver` | none | `202 { "delivery": delivery }` |
 | `GET /deliveries/:id/attempts` | none | `200 { "attempts": [attempt, ...] }` |
 
