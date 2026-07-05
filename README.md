@@ -361,42 +361,48 @@ Requests without a resolved current user get a `401`.
 
 ### Authorization
 
-Authorization lives in one place: a **policy** class (`config.policy_class`,
-default `Angarium::Api::Policy`). It answers three questions, and Angarium runs
-it in the controller's context, so `current_user`, `params`, and `controller` are
-available:
+Authorization lives in one place: a **policy** class, `config.policy_class`
+(default `Angarium::Api::Policy`). Generate one to start from:
 
-- `#scope`: which endpoints this user may see and act on (reads and finds go
-  through it; deliveries and attempts scope through their endpoint).
-- `#create_owner`: who a newly-created endpoint belongs to (set before
-  `#create?` runs, so you can gate the target owner there).
-- `#<action>?`: whether each action is allowed (`show?`, `create?`, `update?`,
-  `rotate_secret?`, `redeliver?`, and so on).
+```bash
+bin/rails g angarium:policy        # app/policies/webhook_endpoint_policy.rb
+```
 
-Subclass and override only what you need. The defaults are single-owner: you see
-and create your own endpoints and may do anything to them.
+Angarium instantiates the policy per request with the controller and (for member
+actions) the target record, and runs it in the controller's context, so
+`current_user`, `params`, `controller`, and `record` are all available. The
+policy answers three things:
+
+| Method | Default | Purpose |
+| --- | --- | --- |
+| `scope(relation)` | `relation.where(owner: current_user)` | Narrows a base relation to the endpoints this user may see and act on. Reads, finds, and delivery/attempt access all go through it. |
+| `owner` | `current_user` | The owner assigned to a newly-created endpoint. Set before `create?` runs, so you can gate the target owner there via `record.owner`. |
+| `index?` `show?` `create?` `update?` `destroy?` | `true` | Whether each action is allowed. |
+| `rotate_secret?` `pause?` `enable?` `ping?` `redeliver?` | `update?` | Member actions; default to the `update?` capability. |
+
+Override only what you need; the defaults are single-owner (you see and manage
+your own endpoints). A denied action returns `403`; anything outside `scope` is a
+`404`.
 
 ```ruby
 class WebhookEndpointPolicy < Angarium::Api::Policy
-  # Multi-tenant visibility
-  def scope = current_user.account.webhook_endpoints
+  # Multi-tenant visibility: compose on top of the relation you're given.
+  def scope(relation) = relation.where(owner_id: current_user.account.owner_ids)
 
-  # Admins may create on behalf of any owner in their account; others, only self
-  def create_owner
+  # Admins may create for any owner in their account (via an owner_id param);
+  # everyone else creates for themselves.
+  def owner
     id = params[:owner_id]
-    id ? current_user.account.owners.find(id) : current_user
+    id && current_user.admin? ? current_user.account.owners.find(id) : current_user
   end
-  def create? = current_user.admin? || record.owner == current_user
 
-  # Restrict individual actions
+  # Restrict individual actions (members default to update?, which defaults true).
+  def update?  = current_user.can?(:manage_webhooks)
   def destroy? = current_user.admin?
-  # rotate_secret?/pause?/enable?/ping?/redeliver? default to update?
 end
 
 config.policy_class = "WebhookEndpointPolicy"
 ```
-
-Anything outside `#scope` is a `404`; a denied action is a `403`.
 
 ### Objects
 

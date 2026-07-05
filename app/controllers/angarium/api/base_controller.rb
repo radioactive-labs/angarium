@@ -35,9 +35,9 @@ module Angarium
         Angarium.config.policy_class.to_s.constantize.new(self, record)
       end
 
-      # The endpoints this user may see/act on (from the policy).
+      # The endpoints this user may see/act on: the policy narrows the base relation.
       def endpoint_scope
-        angarium_policy.scope
+        angarium_policy.scope(Angarium::Endpoint.all)
       end
 
       # A delivery whose endpoint is within the caller's scope, or 404.

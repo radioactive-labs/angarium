@@ -1,8 +1,8 @@
 require "test_helper"
 
-# Resolves the create-owner from a param (admin acting on behalf of another owner).
+# Resolves the owner from a param (admin acting on behalf of another owner).
 class DelegatingPolicy < Angarium::Api::Policy
-  def create_owner = Owner.find(params[:owner_id])
+  def owner = Owner.find(params[:owner_id])
 end
 
 class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
@@ -52,7 +52,7 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     assert_equal @owner, Angarium::Endpoint.find(body["id"]).owner
   end
 
-  test "a policy's create_owner can create on behalf of another owner" do
+  test "a policy's owner can create on behalf of another owner" do
     Angarium.config.stub(:policy_class, "DelegatingPolicy") do
       post "/angarium/endpoints",
         params: { owner_id: @other.id,

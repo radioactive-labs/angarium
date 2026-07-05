@@ -14,16 +14,16 @@ class DenyAcmePolicy < Angarium::Api::Policy
   def show? = current_user.name != "Acme"
 end
 
-# Resolves the create-owner from a param, then gates who may act on behalf of
-# another owner in create? (record.owner is the resolved target).
+# Resolves the owner from a param, then gates who may act on behalf of another
+# owner in create? (record.owner is the resolved target).
 class DelegateOwnOnlyPolicy < Angarium::Api::Policy
-  def create_owner = Owner.find(params[:owner_id])
+  def owner = Owner.find(params[:owner_id])
   def create? = record.owner == current_user
 end
 
-# A broad scope (multi-tenant admin who sees everything).
+# A broad scope (multi-tenant admin who sees everything): don't narrow the base.
 class AllEndpointsPolicy < Angarium::Api::Policy
-  def scope = Angarium::Endpoint.all
+  def scope(relation) = relation
 end
 
 class Angarium::Api::PolicyTest < ActionDispatch::IntegrationTest
@@ -66,7 +66,7 @@ class Angarium::Api::PolicyTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "create_owner and create? together gate acting on behalf of another owner" do
+  test "owner and create? together gate acting on behalf of another owner" do
     Angarium.config.stub(:policy_class, "DelegateOwnOnlyPolicy") do
       post "/angarium/endpoints",
         params: { owner_id: @other.id, endpoint: { name: "n", url: "https://203.0.113.20/h" } },

@@ -7,10 +7,11 @@
 - Optional JSON API (mount `Angarium::Engine`): endpoints CRUD +
   rotate_secret/pause/enable/ping, delivery browsing, and redeliver. Authenticated
   via your current-user convention (`config.parent_controller`/`config.current_user`).
-  Authorization is one class, `config.policy_class` (subclass `Angarium::Api::Policy`):
-  `#scope` (visibility), `#create_owner` (owner of a new endpoint, for admin
-  on-behalf-of), and `#<action>?` predicates. The signing secret is revealed only
-  on create/rotate; `custom_headers` is write-only.
+  Authorization is one class, `config.policy_class` (subclass `Angarium::Api::Policy`,
+  scaffold with `bin/rails g angarium:policy`): `#scope(relation)` (visibility),
+  `#owner` (owner of a new endpoint, for admin on-behalf-of), and `#<action>?`
+  predicates. The signing secret is revealed only on create/rotate; `custom_headers`
+  is write-only.
 - `Angarium::Signature.verify(request:, secret:)` reads the raw body and
   `webhook-*` headers from a Rails request, so receiver-side verification is a
   one-liner (explicit `payload:`/`id:`/`timestamp:`/`signature:` still supported).

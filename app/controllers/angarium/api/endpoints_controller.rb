@@ -15,10 +15,10 @@ module Angarium
       end
 
       def create
-        # The owner comes from the policy's #create_owner (default: current_user),
-        # set before authorize! so policy #create? can gate the target owner.
+        # The owner comes from the policy's #owner (default: current_user), set
+        # before authorize! so policy #create? can gate the target owner.
         endpoint = Angarium::Endpoint.new(endpoint_params)
-        endpoint.owner = angarium_policy.create_owner
+        endpoint.owner = angarium_policy.owner
         authorize!(endpoint)
         endpoint.save!
         # The signing secret is revealed once, on creation.

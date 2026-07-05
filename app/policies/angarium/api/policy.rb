@@ -1,9 +1,9 @@
 module Angarium
   module Api
     # The single place for API authorization:
-    #   #scope         which endpoints this user may see and act on
-    #   #create_owner  who a newly-created endpoint belongs to
-    #   #<action>?     whether each action is allowed
+    #   #scope(relation)  narrows a base relation to what this user may see
+    #   #owner            who a newly-created endpoint belongs to
+    #   #<action>?        whether each action is allowed
     #
     # Angarium instantiates config.policy_class per request with the controller
     # and (for member actions) the target record, and runs it in the controller's
@@ -23,16 +23,17 @@ module Angarium
       def current_user = controller.angarium_current_user
       def params = controller.params
 
-      # Endpoints this user may see and act on. Reads and finds go through this;
-      # deliveries and attempts scope through their endpoint.
-      def scope
-        Angarium::Endpoint.where(owner: current_user)
+      # Narrow the given base relation to the endpoints this user may see and act
+      # on (reads and finds go through this; deliveries and attempts scope through
+      # their endpoint). Receives a relation so you can compose on top of it.
+      def scope(relation)
+        relation.where(owner: current_user)
       end
 
       # Owner assigned to a newly-created endpoint. Override to let an admin
       # create on behalf of another owner (e.g. read a param), then gate who may
       # do so in #create? via `record.owner`.
-      def create_owner
+      def owner
         current_user
       end
 
