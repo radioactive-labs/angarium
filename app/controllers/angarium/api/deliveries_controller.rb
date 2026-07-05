@@ -5,8 +5,7 @@ module Angarium
       def index
         endpoint = endpoint_scope.find(params[:endpoint_id])
         authorize!(endpoint)
-        deliveries = paginate(endpoint.deliveries.includes(:event).order(created_at: :desc))
-        render json: { deliveries: deliveries.map { |d| delivery_json(d) } }
+        render_collection(:deliveries, endpoint.deliveries.includes(:event).order(created_at: :desc)) { |d| delivery_json(d) }
       end
 
       # GET /deliveries/:id

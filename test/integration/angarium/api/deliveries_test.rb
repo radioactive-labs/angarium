@@ -35,6 +35,13 @@ class Angarium::Api::DeliveriesTest < ActionDispatch::IntegrationTest
     assert_equal [@attempt.id], JSON.parse(response.body)["attempts"].map { |a| a["id"] }
   end
 
+  test "list responses advertise pagination" do
+    get "/angarium/deliveries/#{@delivery.id}/attempts?limit=1", headers: auth(@owner)
+    assert_response :ok
+    assert_equal({ "limit" => 1, "offset" => 0, "count" => 1, "total" => 1 },
+      JSON.parse(response.body)["pagination"])
+  end
+
   test "does not expose deliveries outside the caller's scope" do
     get "/angarium/deliveries/#{@delivery.id}", headers: auth(@other)
     assert_response :not_found

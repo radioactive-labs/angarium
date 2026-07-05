@@ -5,8 +5,7 @@ module Angarium
       def index
         delivery = scoped_delivery(params[:delivery_id])
         authorize!(delivery)
-        attempts = paginate(delivery.delivery_attempts.order(created_at: :desc))
-        render json: { attempts: attempts.map { |a| attempt_json(a) } }
+        render_collection(:attempts, delivery.delivery_attempts.order(created_at: :desc)) { |a| attempt_json(a) }
       end
     end
   end

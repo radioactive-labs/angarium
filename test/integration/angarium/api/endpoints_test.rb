@@ -32,6 +32,16 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     refute endpoints.first.key?("custom_headers")
   end
 
+  test "index pages with limit/offset and reports the total" do
+    2.times { |i| @owner.webhook_endpoints.create!(name: "e#{i}", url: "https://203.0.113.7#{i}/h", subscribed_events: ["*"]) }
+
+    get "/angarium/endpoints?limit=2&offset=1", headers: auth(@owner)
+    assert_response :ok
+    body = JSON.parse(response.body)
+    assert_equal 2, body["endpoints"].size
+    assert_equal({ "limit" => 2, "offset" => 1, "count" => 2, "total" => 3 }, body["pagination"])
+  end
+
   test "show finds within scope and 404s across scope" do
     get "/angarium/endpoints/#{@endpoint.id}", headers: auth(@owner)
     assert_response :ok

@@ -5,8 +5,7 @@ module Angarium
 
       def index
         authorize!
-        endpoints = paginate(endpoint_scope.order(created_at: :desc))
-        render json: { endpoints: endpoints.map { |e| endpoint_json(e) } }
+        render_collection(:endpoints, endpoint_scope.order(created_at: :desc)) { |e| endpoint_json(e) }
       end
 
       def show

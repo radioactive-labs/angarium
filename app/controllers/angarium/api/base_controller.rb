@@ -50,10 +50,17 @@ module Angarium
         raise Angarium::Api::NotAuthorized unless angarium_policy(record).public_send("#{action_name}?")
       end
 
-      def paginate(relation)
+      # Render a paginated list. Applies ?limit (default 50, max 200) and ?offset,
+      # and advertises the window with a `pagination` object so clients can page
+      # (there's more when offset + count < total).
+      def render_collection(key, relation, &serializer)
         limit = params.fetch(:limit, 50).to_i.clamp(1, 200)
         offset = [params.fetch(:offset, 0).to_i, 0].max
-        relation.limit(limit).offset(offset)
+        records = relation.limit(limit).offset(offset).to_a
+        render json: {
+          key => records.map(&serializer),
+          pagination: { limit: limit, offset: offset, count: records.size, total: relation.count }
+        }
       end
 
       def render_error(status, message, **extra)

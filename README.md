@@ -425,13 +425,16 @@ included (see the note below):
 // attempt
 { "id": 7, "delivery_id": 42, "response_code": 200, "response_body": "ok",
   "error": null, "duration": 0.12, "created_at": "2026-07-04T12:00:01Z" }
+
+// pagination (on every list response)
+{ "limit": 50, "offset": 0, "count": 20, "total": 137 }
 ```
 
 ### Routes
 
 | Method & path | Request body | Response |
 | --- | --- | --- |
-| `GET /endpoints` | none | `200 { "endpoints": [endpoint, ...] }` |
+| `GET /endpoints` | none | `200 { "endpoints": [endpoint, ...], "pagination": pagination }` |
 | `POST /endpoints` | `{ "endpoint": { "name", "url", "subscribed_events": [...] } }` | `201 { "endpoint": {...endpoint, "signing_secret": "whsec_..."} }` |
 | `GET /endpoints/:id` | none | `200 { "endpoint": endpoint }` |
 | `PATCH /endpoints/:id` | `{ "endpoint": { "name": "New name" } }` | `200 { "endpoint": endpoint }` |
@@ -439,14 +442,17 @@ included (see the note below):
 | `POST /endpoints/:id/rotate_secret` | none | `200 { "endpoint": endpoint, "signing_secret": "whsec_..." }` |
 | `POST /endpoints/:id/pause`, `/enable` | none | `200 { "endpoint": endpoint }` |
 | `POST /endpoints/:id/ping` | none | `202 { "delivery": delivery }` |
-| `GET /endpoints/:id/deliveries` | none | `200 { "deliveries": [delivery, ...] }` |
+| `GET /endpoints/:id/deliveries` | none | `200 { "deliveries": [delivery, ...], "pagination": pagination }` |
 | `GET /deliveries/:id` | none | `200 { "delivery": delivery }` |
 | `POST /deliveries/:id/redeliver` | none | `202 { "delivery": delivery }` |
-| `GET /deliveries/:id/attempts` | none | `200 { "attempts": [attempt, ...] }` |
+| `GET /deliveries/:id/attempts` | none | `200 { "attempts": [attempt, ...], "pagination": pagination }` |
 
 The `signing_secret` is returned only by `create` and `rotate_secret`, never in
 any other response; `custom_headers` (which may hold a credential) is write-only
-and never echoed. Collection endpoints accept `?limit=` (max 200) and `?offset=`.
+and never echoed. List endpoints accept `?limit=` (default 50, max 200) and
+`?offset=`, and every list response carries a `pagination` object (`limit`,
+`offset`, `count` in this page, `total` overall); there are more when
+`offset + count < total`.
 Errors are JSON: `422 { "error": "validation failed", "details": [...] }` for an
 invalid body, plus `401` (unauthenticated), `403` (policy denied), and `404`
 (out of scope).
