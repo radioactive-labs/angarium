@@ -194,6 +194,72 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     assert delivery.reload.delivering?
   end
 
+  # --- Status-code handling & callbacks ---------------------------------------
+
+  def gone_client
+    FakeAngariumClient.new(
+      Angarium::Client::Result.new(success: false, code: 410, body: "", duration: 0.0, headers: {})
+    )
+  end
+
+  # Set a config attribute for the block and restore it after. Used for the
+  # callback attrs: Minitest's `stub` auto-invokes a value that responds to
+  # :call, so it can't be used to install a Proc.
+  def with_config(attr, value)
+    previous = Angarium.config.public_send(attr)
+    Angarium.config.public_send("#{attr}=", value)
+    yield
+  ensure
+    Angarium.config.public_send("#{attr}=", previous)
+  end
+
+  test "410 Gone disables the endpoint and marks the delivery gone (no retry)" do
+    delivery = create_delivery
+    delivery.deliver!(client: gone_client)
+
+    delivery.reload
+    assert delivery.gone?
+    assert_nil delivery.next_attempt_at
+
+    @endpoint.reload
+    refute @endpoint.active?, "410 should disable the endpoint"
+    assert @endpoint.disabled_at.present?
+  end
+
+  test "410 Gone fires on_endpoint_disabled with reason :gone" do
+    disabled = []
+    with_config(:on_endpoint_disabled, ->(ep, reason) { disabled << [ep, reason] }) do
+      create_delivery.deliver!(client: gone_client)
+    end
+
+    assert_equal [[@endpoint, :gone]], disabled
+  end
+
+  test "exhausting a delivery fires on_delivery_exhausted" do
+    exhausted = []
+    with_config(:on_delivery_exhausted, ->(d) { exhausted << d }) do
+      Angarium.config.stub(:retry_schedule, []) do
+        create_delivery.deliver!(client: failing_client)
+      end
+    end
+
+    assert_equal 1, exhausted.size
+    assert exhausted.first.exhausted?
+  end
+
+  test "auto-disable fires on_endpoint_disabled with reason :consecutive_failures" do
+    reasons = []
+    with_config(:on_endpoint_disabled, ->(_ep, reason) { reasons << reason }) do
+      Angarium.config.stub(:auto_disable_endpoint_after, 1) do
+        Angarium.config.stub(:retry_schedule, []) do
+          create_delivery.deliver!(client: failing_client)
+        end
+      end
+    end
+
+    assert_equal [:consecutive_failures], reasons
+  end
+
   # --- Ping -------------------------------------------------------------------
 
   test "ping! creates an angarium.ping delivery, enqueues, and delivers to the endpoint" do

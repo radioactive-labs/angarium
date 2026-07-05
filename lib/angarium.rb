@@ -28,5 +28,17 @@ module Angarium
     def dispatch(event_name, payload, owner:)
       Dispatch.call(event_name, payload, owner: owner)
     end
+
+    # Invoke a configured notification callback (e.g. on_delivery_exhausted,
+    # on_endpoint_disabled). A callback raising must never break the delivery
+    # pipeline, so errors are logged and swallowed.
+    def notify(callback_name, *args)
+      callback = config.public_send(callback_name)
+      return unless callback
+
+      callback.call(*args)
+    rescue => e
+      Rails.logger.warn { "[Angarium] #{callback_name} callback raised: #{e.class}: #{e.message}" }
+    end
   end
 end

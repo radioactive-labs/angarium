@@ -5,7 +5,8 @@ module Angarium
                   :primary_key_type, :max_response_body_bytes,
                   :auto_disable_endpoint_after, :respect_retry_after,
                   :max_retry_after, :retry_jitter, :signing_secret_grace_period,
-                  :delivery_attempt_retention, :delivering_timeout
+                  :delivery_attempt_retention, :delivering_timeout,
+                  :on_delivery_exhausted, :on_endpoint_disabled
 
     def initialize
       @job_queue        = :default
@@ -29,6 +30,8 @@ module Angarium
       @signing_secret_grace_period = 24.hours
       @delivery_attempt_retention  = nil
       @delivering_timeout          = 15.minutes
+      @on_delivery_exhausted       = nil # ->(delivery) { ... }
+      @on_endpoint_disabled        = nil # ->(endpoint, reason) { ... } reason: :consecutive_failures | :gone
     end
   end
 end

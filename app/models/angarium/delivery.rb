@@ -2,7 +2,7 @@ require "uri"
 
 module Angarium
   class Delivery < ApplicationRecord
-    STATES = %w[pending delivering succeeded exhausted blocked].freeze
+    STATES = %w[pending delivering succeeded exhausted blocked gone].freeze
 
     belongs_to :event, class_name: "Angarium::Event"
     belongs_to :endpoint, class_name: "Angarium::Endpoint"
@@ -89,7 +89,18 @@ module Angarium
         duration: result.duration
       )
 
-      result.success? ? succeed! : handle_failure!(retry_after: retry_after_seconds(result.headers))
+      # Status handling follows the Standard Webhooks receiver-etiquette guidance:
+      #   2xx           -> success
+      #   410 Gone      -> the receiver wants no more webhooks: disable + stop (terminal)
+      #   everything else (3xx, 429, 5xx, ...) -> retryable failure. 429/502/504
+      #     ("throttle" codes) are retried with backoff and honor Retry-After.
+      if result.success?
+        succeed!
+      elsif result.code == 410
+        handle_gone!
+      else
+        handle_failure!(retry_after: retry_after_seconds(result.headers))
+      end
       attempt
     end
 
@@ -108,6 +119,14 @@ module Angarium
       endpoint.record_delivery_success!
     end
 
+    # HTTP 410 Gone: the receiver is explicitly done with this endpoint. Per the
+    # Standard Webhooks guidance, disable the endpoint (no further deliveries) and
+    # mark this delivery terminal — no retries.
+    def handle_gone!
+      update!(state: "gone", next_attempt_at: nil)
+      endpoint.disable!(reason: :gone)
+    end
+
     def handle_failure!(retry_after: nil)
       schedule = Array(Angarium.config.retry_schedule)
       base = schedule[attempt_count - 1] # attempt_count already incremented for this attempt
@@ -115,6 +134,7 @@ module Angarium
       if base.nil?
         update!(state: "exhausted")
         endpoint.record_delivery_failure!
+        Angarium.notify(:on_delivery_exhausted, self)
       else
         wait = retry_after || jittered(base)
         update!(state: "pending", next_attempt_at: Time.current + wait)

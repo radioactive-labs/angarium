@@ -42,4 +42,10 @@ Angarium.configure do |config|
   # Grace window during which a rotated endpoint's previous signing secret stays
   # valid (deliveries are signed with both), so receivers can roll over with no downtime.
   # config.signing_secret_grace_period = 24.hours
+
+  # Notification callbacks — fire on terminal delivery events so you can alert
+  # consumers out of band (email, Slack, PagerDuty). A raised callback is logged
+  # and swallowed, so it never breaks delivery.
+  # config.on_delivery_exhausted = ->(delivery) { }         # retry schedule exhausted
+  # config.on_endpoint_disabled  = ->(endpoint, reason) { } # reason: :consecutive_failures | :gone (HTTP 410)
 end

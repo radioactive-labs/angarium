@@ -76,14 +76,19 @@ module Angarium
     end
 
     def record_delivery_failure!
-      new_count = consecutive_failures + 1
-      attrs = { consecutive_failures: new_count }
+      update!(consecutive_failures: consecutive_failures + 1)
       threshold = Angarium.config.auto_disable_endpoint_after
-      if threshold && new_count >= threshold && active?
-        attrs[:active] = false
-        attrs[:disabled_at] = Time.current
-      end
-      update!(attrs)
+      disable!(reason: :consecutive_failures) if threshold && consecutive_failures >= threshold
+    end
+
+    # Deactivate the endpoint (no further deliveries) and fire the
+    # on_endpoint_disabled callback once. `reason` is :consecutive_failures
+    # (auto-disable threshold) or :gone (receiver returned HTTP 410).
+    def disable!(reason:)
+      return unless active?
+
+      update!(active: false, disabled_at: Time.current)
+      Angarium.notify(:on_endpoint_disabled, self, reason)
     end
 
     # Deliver a synthetic `angarium.ping` event to this endpoint, bypassing

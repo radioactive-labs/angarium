@@ -38,6 +38,14 @@
   keeping prior attempt history.
 - Endpoint auto-disable after `config.auto_disable_endpoint_after` consecutive
   failed deliveries (`consecutive_failures`/`disabled_at`), resetting on success.
+- Standard Webhooks status-code handling: `410 Gone` disables the endpoint
+  immediately and marks the delivery `gone` (new terminal state, no retries);
+  `429`/`502`/`504` and other non-2xx responses stay retryable with backoff and
+  honor `Retry-After`; redirects are not followed.
+- Notification callbacks `config.on_delivery_exhausted` (delivery) and
+  `config.on_endpoint_disabled` (endpoint, reason: `:consecutive_failures` |
+  `:gone`) for alerting consumers out of band; a raised callback is logged and
+  swallowed.
 - Honors a receiver's `Retry-After` header (seconds or HTTP-date) for the next
   attempt, capped by `config.max_retry_after` and toggleable via
   `config.respect_retry_after`.

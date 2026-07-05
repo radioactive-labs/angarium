@@ -165,6 +165,17 @@ Each `DeliveryAttempt` stores the response body, truncated to
 `config.max_response_body_bytes` bytes (default `65_536`; set `nil` to store the
 full body).
 
+### Status-code handling
+
+Angarium follows the Standard Webhooks receiver-etiquette guidance:
+
+| Response | Handling |
+| --- | --- |
+| `2xx` | Success. |
+| `410 Gone` | The receiver wants no more webhooks. The **endpoint is disabled** (`active` → `false`) and the delivery is marked `gone` — no retries. |
+| `429`, `502`, `504` | Retryable failure — retried with backoff, honoring `Retry-After` when present (the recommended way to throttle). |
+| `3xx` and everything else | Retryable failure. Redirects are **not** followed (following them loads both sides); update the endpoint URL instead. |
+
 ### Backoff jitter
 
 Each retry delay gets a small amount of additive positive jitter
@@ -195,7 +206,31 @@ Set `config.auto_disable_endpoint_after` to a number of **consecutive** failed
 deliveries after which an endpoint is automatically disabled (`active` → `false`,
 `disabled_at` timestamped). `endpoint.consecutive_failures` tracks the running
 count and resets to `0` on the next successful delivery. Left `nil` (the
-default), endpoints are never auto-disabled.
+default), endpoints are never auto-disabled. (A `410 Gone` response disables the
+endpoint immediately, regardless of this setting.)
+
+### Notification callbacks
+
+When delivery fails for good, the Standard Webhooks guidance is to notify the
+consumer out of band (email, Slack, PagerDuty). Angarium is headless, so it hands
+you the events and lets you do the notifying via two config callbacks:
+
+```ruby
+Angarium.configure do |config|
+  # A delivery has exhausted its whole retry schedule.
+  config.on_delivery_exhausted = ->(delivery) do
+    AdminMailer.webhook_failed(delivery).deliver_later
+  end
+
+  # An endpoint was disabled. reason is :consecutive_failures or :gone (HTTP 410).
+  config.on_endpoint_disabled = ->(endpoint, reason) do
+    AdminMailer.endpoint_disabled(endpoint, reason).deliver_later
+  end
+end
+```
+
+Both are optional. A callback that raises is logged and swallowed, so a broken
+notifier never breaks delivery.
 
 ### Recovering interrupted deliveries
 
@@ -295,7 +330,8 @@ with all options: `job_queue`, `http_timeout`, `open_timeout`, `user_agent`,
 `retry_schedule`, `block_private_ips`, `primary_key_type`,
 `max_response_body_bytes`, `auto_disable_endpoint_after`, `respect_retry_after`,
 `max_retry_after`, `retry_jitter`, `signing_secret_grace_period`,
-`delivery_attempt_retention`, and `delivering_timeout`.
+`delivery_attempt_retention`, `delivering_timeout`, `on_delivery_exhausted`,
+and `on_endpoint_disabled`.
 
 ### Primary keys
 
