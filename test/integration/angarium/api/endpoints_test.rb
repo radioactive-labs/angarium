@@ -5,6 +5,11 @@ class DelegatingPolicy < Angarium::Api::Policy
   def owner = Owner.find(params[:owner_id])
 end
 
+# A trusted operator who may set the SSRF-sensitive network controls.
+class NetworkAdminPolicy < Angarium::Api::Policy
+  def permit_network_controls? = true
+end
+
 class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
   setup do
     @owner = Owner.create!(name: "Acme")
@@ -71,6 +76,25 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     end
     assert_response :created
     assert_equal @other, Angarium::Endpoint.find(JSON.parse(response.body)["endpoint"]["id"]).owner
+  end
+
+  test "network controls are not API-writable by default (SSRF guard)" do
+    patch "/angarium/endpoints/#{@endpoint.id}",
+      params: { endpoint: { allow_private_network: true, allowed_networks: ["10.0.0.0/8"] } },
+      headers: auth(@owner), as: :json
+    assert_response :ok
+    @endpoint.reload
+    refute @endpoint.allow_private_network, "allow_private_network must not be settable via the API"
+    assert_empty @endpoint.allowed_networks
+  end
+
+  test "a policy can permit network controls for trusted operators" do
+    Angarium.config.stub(:policy_class, "NetworkAdminPolicy") do
+      patch "/angarium/endpoints/#{@endpoint.id}",
+        params: { endpoint: { allow_private_network: true } }, headers: auth(@owner), as: :json
+    end
+    assert_response :ok
+    assert @endpoint.reload.allow_private_network
   end
 
   test "create with invalid params returns 422 with details" do

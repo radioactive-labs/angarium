@@ -14,9 +14,10 @@ module Angarium
       @http_timeout     = 10
       @open_timeout     = 5
       @user_agent       = "Angarium/#{Angarium::VERSION}"
-      # Standard Webhooks recommended schedule (delays between retries; the
-      # first delivery is immediate). Spans ~10 days with exponential-ish
-      # backoff; jitter is added per attempt (see config.retry_jitter).
+      # Follows the Standard Webhooks recommendation of a multi-day schedule with
+      # exponential backoff (delays between retries; the first delivery is
+      # immediate). Spans ~10 days; jitter is added per attempt (see
+      # config.retry_jitter).
       @retry_schedule   = [
         5.seconds, 5.minutes, 30.minutes, 2.hours, 5.hours,
         10.hours, 14.hours, 20.hours, 24.hours, 36.hours, 48.hours, 72.hours

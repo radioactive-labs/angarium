@@ -181,11 +181,12 @@ are rejected at validation (case-insensitively) and can't be overridden.
 ## Retries
 
 Failed deliveries (non-2xx or connection errors) are retried on the schedule in
-`config.retry_schedule`. The default is the [Standard Webhooks](https://www.standardwebhooks.com)
-recommended schedule: twelve retries spanning ~10 days (`5s, 5m, 30m, 2h, 5h,
-10h, 14h, 20h, 24h, 36h, 48h, 72h`, after an immediate first delivery). Every
-attempt is recorded as an `Angarium::DeliveryAttempt`. After the schedule is
-exhausted the delivery is marked `exhausted`.
+`config.retry_schedule`. The default follows the [Standard Webhooks](https://www.standardwebhooks.com)
+recommendation of a multi-day schedule with exponential backoff and jitter: our
+instantiation is twelve retries spanning ~10 days (`5s, 5m, 30m, 2h, 5h, 10h,
+14h, 20h, 24h, 36h, 48h, 72h`, after an immediate first delivery). Every attempt
+is recorded as an `Angarium::DeliveryAttempt`. After the schedule is exhausted
+the delivery is marked `exhausted`.
 
 Each `DeliveryAttempt` stores the response body, truncated to
 `config.max_response_body_bytes` bytes (default `65_536`; set `nil` to store the
@@ -218,6 +219,12 @@ keeps a malicious or misconfigured receiver from using a tiny `Retry-After` to
 defeat our backoff and make us retry aggressively. The honored value is capped at
 `config.max_retry_after` (default `3600` seconds), and the whole behavior can be
 disabled with `config.respect_retry_after = false`.
+
+One interaction to note with the default schedule: because the cap is one hour,
+`Retry-After` can only ever extend the wait during the early steps (up to the
+`30m` step). Once backoff reaches `2h` and beyond, a capped `Retry-After` is
+always shorter than the scheduled delay, so it has no effect. If you need
+receivers to push back harder late in the schedule, raise `config.max_retry_after`.
 
 ### Manual redelivery
 
@@ -318,9 +325,10 @@ repeat as a no-op.
 ## Data retention
 
 Every delivery attempt stores the receiver's response body (capped at
-`config.max_response_body_bytes`, 64KB by default), so `angarium_delivery_attempts`
-grows with delivery volume × retries, so a busy app talking to a flapping receiver
-can accumulate rows quickly. You have three options to keep it bounded:
+`config.max_response_body_bytes`, 64KB by default). Because
+`angarium_delivery_attempts` grows with delivery volume × retries, a busy app
+talking to a flapping receiver can accumulate rows quickly. You have three
+options to keep it bounded:
 
 ```ruby
 # 1. Set a retention window and prune on a schedule (cron / your scheduler):
@@ -371,13 +379,14 @@ bin/rails g angarium:policy        # app/policies/webhook_endpoint_policy.rb
 
 Angarium instantiates the policy per request with the controller and (for member
 actions) the target record, and runs it in the controller's context, so
-`current_user`, `params`, `controller`, and `record` are all available. The
-policy answers three things:
+`current_user`, `params`, `controller`, and `record` are all available. Its
+methods:
 
 | Method | Default | Purpose |
 | --- | --- | --- |
 | `scope(relation)` | `relation.where(owner: current_user)` | Narrows a base relation to the endpoints this user may see and act on. Reads, finds, and delivery/attempt access all go through it. |
 | `owner` | `current_user` | The owner assigned to a newly-created endpoint. Set before `create?` runs, so you can gate the target owner there via `record.owner`. |
+| `permit_network_controls?` | `false` | Whether `allow_private_network` / `allowed_networks` are writable via the API. SSRF-sensitive; enable only for trusted operators. |
 | `index?` `show?` `create?` `update?` `destroy?` | `true` | Whether each action is allowed. |
 | `rotate_secret?` `pause?` `enable?` `ping?` `redeliver?` | `update?` | Member actions; default to the `update?` capability. |
 
@@ -456,6 +465,34 @@ included (see the note below):
 - **Errors are JSON.** `422 { "error": "validation failed", "details": [...] }`
   for an invalid body, plus `401` (unauthenticated), `403` (policy denied), and
   `404` (out of scope).
+
+### Permitted attributes
+
+`POST`/`PATCH /endpoints` accept these keys under `endpoint`; anything else is
+ignored (strong parameters):
+
+| Attribute | Type | Notes |
+| --- | --- | --- |
+| `name` | string | |
+| `url` | string | the receiver URL (SSRF-validated) |
+| `subscribed_events` | array of strings | event name patterns, e.g. `["invoice.*"]` |
+| `custom_headers` | object | write-only; sent with each delivery, never echoed back |
+| `allow_private_network` | boolean | **not writable by default**, see below |
+| `allowed_networks` | array of CIDRs | **not writable by default**, see below |
+
+`allow_private_network` and `allowed_networks` relax SSRF protection (they let an
+endpoint target private or loopback addresses), so they are **silently dropped
+from create/update unless the policy opts in**. Never expose them to end users.
+For a trusted-operator surface, permit them in your policy:
+
+```ruby
+class WebhookEndpointPolicy < Angarium::Api::Policy
+  def permit_network_controls? = current_user.operator?
+end
+```
+
+The owner of a created endpoint is not a request parameter; it comes from the
+policy's `owner` (see [Authorization](#authorization)).
 
 ## Security (SSRF protection)
 
@@ -585,8 +622,9 @@ adopting external webhook infrastructure.
 
 | | Angarium | ActionHook | bullet_train-outgoing_webhooks | active_webhook | Svix / Hookdeck Outpost |
 |---|---|---|---|---|---|
-| Type | Rails engine (headless) | Ruby delivery library | Rails engine (Bullet Train) | Ruby library | Hosted / self-hosted service |
+| Type | Rails engine (headless + JSON API) | Ruby delivery library | Rails engine (Bullet Train) | Ruby library | Hosted / self-hosted service |
 | [Persisted endpoints & subscriptions](#30-second-tour) | ✅ per-endpoint event subscriptions | ❌ bring your own model | ✅ (tied to BT teams) | ✅ topics | ✅ |
+| [Endpoint-management JSON API](#http-api) | ✅ auth + policy | ❌ | ❌ | ❌ | ✅ |
 | [HMAC request signing](#verifying-signatures-receiver-side) | ✅ | ✅ (SHA256 fingerprint) | ✅ | ✅ | ✅ |
 | [Standard Webhooks](https://www.standardwebhooks.com) compliant | ✅ | ❌ | ❌ | ❌ | ✅ (Svix initiated the spec) |
 | [Automatic retries with backoff](#retries) | ✅ jitter + `Retry-After` | ❌ (delegates to your job runner) | ✅ | ✅ (via queue adapter) | ✅ |

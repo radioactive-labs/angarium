@@ -24,8 +24,9 @@
   off-the-shelf `standardwebhooks`/Svix libraries in any language.
   `Angarium::Signature.verify` is provided as a convenience.
 - ActiveJob-based delivery with retries and exponential backoff. Default
-  `retry_schedule` follows the Standard Webhooks recommendation (twelve retries
-  over ~10 days: `5s, 5m, 30m, 2h, 5h, 10h, 14h, 20h, 24h, 36h, 48h, 72h`).
+  `retry_schedule` follows the Standard Webhooks recommendation of a multi-day
+  schedule with exponential backoff: twelve retries over ~10 days
+  (`5s, 5m, 30m, 2h, 5h, 10h, 14h, 20h, 24h, 36h, 48h, 72h`).
 - SSRF protection: global private-IP block, per-endpoint `allow_private_network`
   and `allowed_networks` controls, enforced at validation and delivery time.
 - Install generator and migrations.

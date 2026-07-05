@@ -37,6 +37,14 @@ module Angarium
         current_user
       end
 
+      # May the API set the SSRF-sensitive network controls (allow_private_network,
+      # allowed_networks)? Default: no. They let an endpoint target private and
+      # loopback addresses, so expose them only to trusted operators, never end
+      # users. When false, create/update silently ignore those attributes.
+      def permit_network_controls?
+        false
+      end
+
       def index? = true
       def show? = true
       def create? = true

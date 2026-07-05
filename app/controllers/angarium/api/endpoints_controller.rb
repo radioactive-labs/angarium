@@ -67,10 +67,12 @@ module Angarium
       end
 
       def endpoint_params
-        params.require(:endpoint).permit(
-          :name, :url, :allow_private_network,
-          subscribed_events: [], allowed_networks: [], custom_headers: {}
-        )
+        attrs = [:name, :url, {subscribed_events: [], custom_headers: {}}]
+        # allow_private_network / allowed_networks can point an endpoint at private
+        # or loopback addresses (SSRF), so they are not API-writable unless the
+        # policy opts in for trusted operators.
+        attrs.push(:allow_private_network, {allowed_networks: []}) if angarium_policy.permit_network_controls?
+        params.require(:endpoint).permit(*attrs)
       end
     end
   end
