@@ -14,10 +14,22 @@ module Angarium
         template "policy.rb", File.join("app/policies", "#{policy_name.underscore}.rb")
       end
 
-      def show_instructions
-        say ""
-        say "Enable it in config/initializers/angarium.rb:", :green
-        say %(  config.policy_class = "#{class_name}")
+      # Point config.policy_class at the generated class, uncommenting (or
+      # replacing) the line in the initializer so it takes effect immediately.
+      def enable_policy
+        initializer = "config/initializers/angarium.rb"
+
+        unless File.exist?(File.join(destination_root, initializer))
+          say_status :skip, %(#{initializer} not found; set config.policy_class = "#{class_name}" yourself), :yellow
+          return
+        end
+
+        line = %r{^\s*#?\s*config\.policy_class\s*=.*$}
+        if File.read(File.join(destination_root, initializer)).match?(line)
+          gsub_file initializer, line, %(  config.policy_class = "#{class_name}")
+        else
+          say_status :skip, %(add config.policy_class = "#{class_name}" to #{initializer}), :yellow
+        end
       end
 
       private

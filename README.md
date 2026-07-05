@@ -362,7 +362,8 @@ Requests without a resolved current user get a `401`.
 ### Authorization
 
 Authorization lives in one place: a **policy** class, `config.policy_class`
-(default `Angarium::Api::Policy`). Generate one to start from:
+(default `Angarium::Api::Policy`). Generate one to start from (it creates the
+class and points `config.policy_class` at it in your initializer):
 
 ```bash
 bin/rails g angarium:policy        # app/policies/webhook_endpoint_policy.rb
