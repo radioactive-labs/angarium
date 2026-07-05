@@ -6,7 +6,8 @@ module Angarium
                   :auto_disable_endpoint_after, :respect_retry_after,
                   :max_retry_after, :retry_jitter, :signing_secret_grace_period,
                   :delivery_attempt_retention, :delivering_timeout,
-                  :on_delivery_exhausted, :on_endpoint_disabled
+                  :on_delivery_exhausted, :on_endpoint_disabled,
+                  :parent_controller, :current_user, :endpoint_scope, :policy_class
 
     def initialize
       @job_queue        = :default
@@ -32,6 +33,19 @@ module Angarium
       @delivering_timeout          = 15.minutes
       @on_delivery_exhausted       = nil # ->(delivery) { ... }
       @on_endpoint_disabled        = nil # ->(endpoint, reason) { ... } reason: :consecutive_failures | :gone
+
+      # --- Headless JSON API (only used if you mount Angarium::Engine) ---------
+      # Base controller the API inherits from, so your app's authentication
+      # (Devise/Rodauth/etc.) applies to Angarium's endpoints too.
+      @parent_controller = "ApplicationController"
+      # Resolves the current user from the controller (your current-user convention).
+      @current_user      = ->(controller) { controller.current_user }
+      # The set of endpoints a user may see/act on. Deliveries and attempts are
+      # scoped through their endpoint. Override for multi-tenancy.
+      @endpoint_scope    = ->(current_user) { Angarium::Endpoint.where(owner: current_user) }
+      # Optional per-action authorization policy (subclass Angarium::Api::Policy).
+      # nil = allow every action within the scope above.
+      @policy_class      = nil
     end
   end
 end

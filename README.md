@@ -17,9 +17,9 @@ spec, so your receivers verify with off-the-shelf libraries in any language and
 you never write verification docs of your own. That conformance is enforced in
 CI: any drift from the spec fails the build.
 
-Headless by design — models and jobs, no UI forced on your app — and namespaced
-via `isolate_namespace`, so a dashboard can mount on top later. Works with any
-ActiveJob backend on Rails 7.1+.
+Headless by design — models, jobs, and an optional [JSON API](#http-api), no UI
+forced on your app — and namespaced via `isolate_namespace`, so a dashboard can
+mount on top later. Works with any ActiveJob backend on Rails 7.1+.
 
 ### 30-second tour
 
@@ -326,6 +326,86 @@ Angarium::DeliveryAttempt.prune(older_than: 90.days)
 # 3. Or store less per attempt by lowering the response-body cap:
 Angarium.config.max_response_body_bytes = 4_096
 ```
+
+## HTTP API
+
+Angarium ships an optional **headless JSON API** for managing endpoints and
+browsing deliveries — no UI, no HTML, just JSON. Mount the engine wherever you
+like:
+
+```ruby
+# config/routes.rb
+mount Angarium::Engine => "/webhooks"
+```
+
+### Authentication
+
+The API has no auth of its own — it uses yours. Its controllers inherit from
+`config.parent_controller` (default `"ApplicationController"`), so every
+`before_action` your app already runs (Devise, Rodauth, …) applies here too.
+Angarium reads the signed-in user via your current-user convention:
+
+```ruby
+config.parent_controller = "ApplicationController"   # or your API base controller
+config.current_user = ->(controller) { controller.current_user }
+```
+
+Requests without a resolved current user get a `401`.
+
+### Scoping
+
+Every request is scoped to the current user — a user only ever sees or touches
+their own endpoints (and deliveries/attempts through them). The default scopes by
+polymorphic owner; override for multi-tenancy:
+
+```ruby
+config.endpoint_scope = ->(user) { user.account.webhook_endpoints }
+```
+
+Anything outside the scope is a `404`, and `create` sets the owner *from* the
+scope — so a user can't create an endpoint for anyone else.
+
+### Authorization
+
+Scoping decides what exists; a **policy** decides what each user may do with it.
+Set `config.policy_class` to a subclass of `Angarium::Api::Policy`. For each
+action Angarium calls the matching predicate, running it in the controller's
+context so `current_user`, `params`, and `record` are available:
+
+```ruby
+class WebhookEndpointPolicy < Angarium::Api::Policy
+  def create?  = current_user.can?(:manage_webhooks)
+  def update?  = create?
+  def destroy? = current_user.admin?
+  # rotate_secret?/pause?/enable?/ping?/redeliver? default to update?
+end
+
+config.policy_class = "WebhookEndpointPolicy"
+```
+
+Every action defaults to allowed (the scope already isolates data) — override to
+restrict. A denied action returns `403`. Left `nil`, the policy check is skipped.
+
+### Routes
+
+| Method & path | Action |
+| --- | --- |
+| `GET    /endpoints` | list your endpoints |
+| `POST   /endpoints` | create (reveals the `signing_secret` once) |
+| `GET    /endpoints/:id` | show |
+| `PATCH  /endpoints/:id` | update |
+| `DELETE /endpoints/:id` | destroy |
+| `POST   /endpoints/:id/rotate_secret` | rotate the signing secret (returns the new one) |
+| `POST   /endpoints/:id/pause`, `/enable` | change status |
+| `POST   /endpoints/:id/ping` | send a test delivery |
+| `GET    /endpoints/:id/deliveries` | list an endpoint's deliveries |
+| `GET    /deliveries/:id` | show a delivery with its attempts |
+| `POST   /deliveries/:id/redeliver` | re-send a delivery |
+| `GET    /deliveries/:id/attempts` | list a delivery's attempts |
+
+The `signing_secret` is returned only by `create` and `rotate_secret`, never in
+any other response; `custom_headers` (which may hold a credential) is write-only
+and never echoed. Collection endpoints accept `?limit=` (max 200) and `?offset=`.
 
 ## Security (SSRF protection)
 

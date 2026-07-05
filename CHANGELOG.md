@@ -4,6 +4,12 @@
 
 ### Added
 - Rails engine (headless) with `Angarium::Endpoint`, `Event`, `Delivery`, `DeliveryAttempt`.
+- Optional headless JSON API (mount `Angarium::Engine`): endpoints CRUD +
+  rotate_secret/pause/enable/ping, delivery browsing, and redeliver. Authenticated
+  via your current-user convention (`config.parent_controller`/`config.current_user`),
+  data-scoped per user (`config.endpoint_scope`), and per-action authorized by an
+  optional policy (`config.policy_class`, subclass `Angarium::Api::Policy`). The
+  signing secret is revealed only on create/rotate; `custom_headers` is write-only.
 - `Angarium::Delivery.reap_stalled` + `angarium:reap` rake task to recover
   deliveries stranded in `delivering` by a crashed worker (`config.delivering_timeout`).
 - `Angarium.dispatch` event fan-out to active, subscribed endpoints.

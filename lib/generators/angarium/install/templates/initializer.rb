@@ -48,4 +48,18 @@ Angarium.configure do |config|
   # and swallowed, so it never breaks delivery.
   # config.on_delivery_exhausted = ->(delivery) { }         # retry schedule exhausted
   # config.on_endpoint_disabled  = ->(endpoint, reason) { } # reason: :consecutive_failures | :gone (HTTP 410)
+
+  # --- Headless JSON API (only used if you `mount Angarium::Engine`) -----------
+  # Base controller the API inherits from, so your app's authentication applies.
+  # config.parent_controller = "ApplicationController"
+
+  # Resolve the current user from the controller (your current-user convention).
+  # config.current_user = ->(controller) { controller.current_user }
+
+  # The endpoints a user may see/act on (deliveries/attempts scope through them).
+  # config.endpoint_scope = ->(current_user) { Angarium::Endpoint.where(owner: current_user) }
+
+  # Optional per-action authorization policy (subclass Angarium::Api::Policy).
+  # nil = allow every action within the scope above.
+  # config.policy_class = "WebhookEndpointPolicy"
 end
