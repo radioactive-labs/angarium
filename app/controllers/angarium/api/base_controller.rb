@@ -14,6 +14,7 @@ module Angarium
       rescue_from ActiveRecord::RecordNotFound, with: :angarium_render_not_found
       rescue_from ActiveRecord::RecordInvalid, with: :angarium_render_invalid
       rescue_from Angarium::Api::NotAuthorized, with: :angarium_render_forbidden
+      rescue_from Angarium::Api::UnpermittedParameter, with: :angarium_render_unpermitted
 
       # Resolved current user (via config.current_user). Public so policies can
       # read it as `controller.angarium_current_user`.
@@ -73,6 +74,10 @@ module Angarium
 
       def angarium_render_invalid(error)
         render_error(:unprocessable_entity, "validation failed", details: error.record.errors.full_messages)
+      end
+
+      def angarium_render_unpermitted(error)
+        render_error(:unprocessable_entity, "unpermitted parameter", details: [error.message])
       end
 
       # --- serializers ----------------------------------------------------------

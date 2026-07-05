@@ -66,13 +66,44 @@ module Angarium
         @endpoint = endpoint_scope.find(params[:id])
       end
 
+      # SSRF-relevant controls, each gated by its own policy predicate. They are
+      # independent: allow_private_network relaxes the private-IP denylist
+      # (dangerous), while allowed_networks only restricts delivery to a CIDR
+      # allowlist. permit shape per attribute (scalar vs array).
+      NETWORK_CONTROLS = {
+        allow_private_network: :permit_allow_private_network?,
+        allowed_networks: :permit_allowed_networks?
+      }.freeze
+
       def endpoint_params
-        attrs = [:name, :url, {subscribed_events: [], custom_headers: {}}]
-        # allow_private_network / allowed_networks can point an endpoint at private
-        # or loopback addresses (SSRF), so they are not API-writable unless the
-        # policy opts in for trusted operators.
-        attrs.push(:allow_private_network, {allowed_networks: []}) if angarium_policy.permit_network_controls?
-        params.require(:endpoint).permit(*attrs)
+        policy = angarium_policy
+        permitted = [:name, :url, {subscribed_events: [], custom_headers: {}}]
+
+        NETWORK_CONTROLS.each do |attr, predicate|
+          if policy.public_send(predicate)
+            permitted << ((attr == :allowed_networks) ? {allowed_networks: []} : attr)
+          else
+            reject_network_control_change!(attr)
+          end
+        end
+
+        params.require(:endpoint).permit(*permitted)
+      end
+
+      # A request may not change a network control the policy doesn't permit.
+      # Attempting to (a submitted value that differs from the record's current
+      # value) is a 422 naming the attribute, so an escalation attempt fails
+      # loudly rather than being silently ignored. Echoing the current value is a
+      # no-op and allowed, so a client can round-trip the serialized endpoint.
+      def reject_network_control_change!(attr)
+        body = params.fetch(:endpoint, ActionController::Parameters.new)
+        return unless body.key?(attr)
+
+        current = (@endpoint || Angarium::Endpoint.new).public_send(attr)
+        submitted = body[attr]
+        submitted = Array(submitted).map(&:to_s) if attr == :allowed_networks
+
+        raise Angarium::Api::UnpermittedParameter, attr unless submitted == current
       end
     end
   end

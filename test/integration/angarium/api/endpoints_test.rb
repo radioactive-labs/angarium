@@ -5,9 +5,14 @@ class DelegatingPolicy < Angarium::Api::Policy
   def owner = Owner.find(params[:owner_id])
 end
 
-# A trusted operator who may set the SSRF-sensitive network controls.
-class NetworkAdminPolicy < Angarium::Api::Policy
-  def permit_network_controls? = true
+# Independent gates: one permits only the private-network relaxation, the other
+# only the (restrictive) CIDR allowlist.
+class PrivateNetworkPolicy < Angarium::Api::Policy
+  def permit_allow_private_network? = true
+end
+
+class AllowlistPolicy < Angarium::Api::Policy
+  def permit_allowed_networks? = true
 end
 
 class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
@@ -78,23 +83,49 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     assert_equal @other, Angarium::Endpoint.find(JSON.parse(response.body)["endpoint"]["id"]).owner
   end
 
-  test "network controls are not API-writable by default (SSRF guard)" do
+  test "changing a forbidden network control is a loud 422, not a silent drop" do
     patch "/angarium/endpoints/#{@endpoint.id}",
-      params: { endpoint: { allow_private_network: true, allowed_networks: ["10.0.0.0/8"] } },
-      headers: auth(@owner), as: :json
-    assert_response :ok
-    @endpoint.reload
-    refute @endpoint.allow_private_network, "allow_private_network must not be settable via the API"
-    assert_empty @endpoint.allowed_networks
+      params: { endpoint: { allow_private_network: true } }, headers: auth(@owner), as: :json
+    assert_response :unprocessable_entity
+    assert_match "allow_private_network", JSON.parse(response.body)["details"].join
+    refute @endpoint.reload.allow_private_network
   end
 
-  test "a policy can permit network controls for trusted operators" do
-    Angarium.config.stub(:policy_class, "NetworkAdminPolicy") do
+  test "echoing a forbidden network control at its current value is a no-op" do
+    patch "/angarium/endpoints/#{@endpoint.id}",
+      params: { endpoint: { name: "Renamed", allow_private_network: false } },
+      headers: auth(@owner), as: :json
+    assert_response :ok
+    assert_equal "Renamed", @endpoint.reload.name
+  end
+
+  test "permit_allow_private_network? gates only the private-network relaxation" do
+    Angarium.config.stub(:policy_class, "PrivateNetworkPolicy") do
       patch "/angarium/endpoints/#{@endpoint.id}",
         params: { endpoint: { allow_private_network: true } }, headers: auth(@owner), as: :json
+      assert_response :ok
+      assert @endpoint.reload.allow_private_network
+
+      # allowed_networks stays gated by its own predicate.
+      patch "/angarium/endpoints/#{@endpoint.id}",
+        params: { endpoint: { allowed_networks: ["203.0.113.0/24"] } }, headers: auth(@owner), as: :json
+      assert_response :unprocessable_entity
     end
-    assert_response :ok
-    assert @endpoint.reload.allow_private_network
+  end
+
+  test "permit_allowed_networks? gates only the CIDR allowlist" do
+    Angarium.config.stub(:policy_class, "AllowlistPolicy") do
+      # 203.0.113.0/24 includes the endpoint's own address, so it stays valid.
+      patch "/angarium/endpoints/#{@endpoint.id}",
+        params: { endpoint: { allowed_networks: ["203.0.113.0/24"] } }, headers: auth(@owner), as: :json
+      assert_response :ok
+      assert_equal ["203.0.113.0/24"], @endpoint.reload.allowed_networks
+
+      # allow_private_network stays gated by its own predicate.
+      patch "/angarium/endpoints/#{@endpoint.id}",
+        params: { endpoint: { allow_private_network: true } }, headers: auth(@owner), as: :json
+      assert_response :unprocessable_entity
+    end
   end
 
   test "create with invalid params returns 422 with details" do

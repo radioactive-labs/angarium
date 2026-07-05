@@ -386,7 +386,8 @@ methods:
 | --- | --- | --- |
 | `scope(relation)` | `relation.where(owner: current_user)` | Narrows a base relation to the endpoints this user may see and act on. Reads, finds, and delivery/attempt access all go through it. |
 | `owner` | `current_user` | The owner assigned to a newly-created endpoint. Set before `create?` runs, so you can gate the target owner there via `record.owner`. |
-| `permit_network_controls?` | `false` | Whether `allow_private_network` / `allowed_networks` are writable via the API. SSRF-sensitive; enable only for trusted operators. |
+| `permit_allow_private_network?` | `false` | Whether `allow_private_network` (relax the private-IP block) is API-writable. Dangerous; trusted operators only. |
+| `permit_allowed_networks?` | `false` | Whether `allowed_networks` (a restrictive CIDR allowlist) is API-writable. |
 | `index?` `show?` `create?` `update?` `destroy?` | `true` | Whether each action is allowed. |
 | `rotate_secret?` `pause?` `enable?` `ping?` `redeliver?` | `update?` | Member actions; default to the `update?` capability. |
 
@@ -474,25 +475,45 @@ ignored (strong parameters):
 | Attribute | Type | Notes |
 | --- | --- | --- |
 | `name` | string | |
-| `url` | string | the receiver URL (SSRF-validated) |
-| `subscribed_events` | array of strings | event name patterns, e.g. `["invoice.*"]` |
+| `url` | string | the receiver URL (SSRF-validated on every change) |
+| `subscribed_events` | array of strings | event patterns: exact, `"prefix.*"`, or `"*"` |
 | `custom_headers` | object | write-only; sent with each delivery, never echoed back |
-| `allow_private_network` | boolean | **not writable by default**, see below |
-| `allowed_networks` | array of CIDRs | **not writable by default**, see below |
+| `allow_private_network` | boolean | privileged; **not writable by default**, see below |
+| `allowed_networks` | array of CIDRs | privileged; **not writable by default**, see below |
 
-`allow_private_network` and `allowed_networks` relax SSRF protection (they let an
-endpoint target private or loopback addresses), so they are **silently dropped
-from create/update unless the policy opts in**. Never expose them to end users.
-For a trusted-operator surface, permit them in your policy:
+`status` is not writable (use the `pause` / `enable` actions), and the owner of a
+created endpoint comes from the policy's `owner`, not the request.
+
+`allow_private_network` and `allowed_networks` are **independent** SSRF controls,
+each gated by its own policy predicate (default off), because they do opposite
+things:
+
+- `allow_private_network` **relaxes** protection: it lets an endpoint deliver to
+  private and loopback addresses. This is the dangerous one; an end user who can
+  set it can point a webhook at your internal network.
+- `allowed_networks` **restricts** delivery to a CIDR allowlist (both it and the
+  private-IP denylist must still pass), so it's safe to expose more widely.
+
+You can always set them from trusted code, regardless of the API:
+
+```ruby
+endpoint.update!(allow_private_network: true, allowed_networks: ["10.0.5.0/24"])
+```
+
+To permit either through the API, override its predicate. Being independent, you
+can allow the safe one without the dangerous one:
 
 ```ruby
 class WebhookEndpointPolicy < Angarium::Api::Policy
-  def permit_network_controls? = current_user.operator?
+  def permit_allow_private_network? = current_user.operator?   # dangerous: operators only
+  def permit_allowed_networks?      = true                     # restrictive: safe to expose
 end
 ```
 
-The owner of a created endpoint is not a request parameter; it comes from the
-policy's `owner` (see [Authorization](#authorization)).
+A request that tries to **change** a control it isn't permitted to set gets a
+`422` naming the attribute, rather than the change being silently dropped, so a
+misconfigured client fails loudly instead of appearing to work. (Sending a
+control's current value is a no-op.)
 
 ## Security (SSRF protection)
 

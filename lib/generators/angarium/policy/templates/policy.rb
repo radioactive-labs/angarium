@@ -17,6 +17,12 @@ class <%= class_name %> < Angarium::Api::Policy
   #   current_user
   # end
 
+  # SSRF controls, gated independently (default off). allow_private_network
+  # relaxes the private-IP block (dangerous, operators only); allowed_networks
+  # only restricts delivery to a CIDR allowlist (safe to expose more widely).
+  # def permit_allow_private_network? = current_user.admin?
+  # def permit_allowed_networks? = true
+
   # Per-action permissions. rotate_secret?/pause?/enable?/ping?/redeliver? all
   # default to update?.
   # def index?   = true

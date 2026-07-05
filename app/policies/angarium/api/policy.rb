@@ -37,11 +37,20 @@ module Angarium
         current_user
       end
 
-      # May the API set the SSRF-sensitive network controls (allow_private_network,
-      # allowed_networks)? Default: no. They let an endpoint target private and
-      # loopback addresses, so expose them only to trusted operators, never end
-      # users. When false, create/update silently ignore those attributes.
-      def permit_network_controls?
+      # May the API set allow_private_network? Default: no. This *relaxes* SSRF
+      # protection (delivery to private/loopback addresses), so an end user who
+      # can set it can point a webhook at your internal network. Trusted operators
+      # only.
+      def permit_allow_private_network?
+        false
+      end
+
+      # May the API set allowed_networks (a per-endpoint CIDR allowlist)? Default:
+      # no. Unlike allow_private_network this only *restricts* where an endpoint
+      # may deliver, so it's safe to expose more widely, but it's gated
+      # independently so you can allow it without allowing the private-network
+      # relaxation.
+      def permit_allowed_networks?
         false
       end
 
