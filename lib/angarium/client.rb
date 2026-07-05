@@ -3,7 +3,7 @@ require "httpx"
 module Angarium
   # Thin wrapper over HTTPX. Returns a plain result struct so callers/tests
   # never touch HTTPX response objects directly. Note: HTTPX does NOT follow
-  # redirects unless the :follow_redirects plugin is enabled — we intentionally
+  # redirects unless the :follow_redirects plugin is enabled, so we intentionally
   # leave it disabled so a 3xx to an internal URL can't bypass SSRF checks.
   class Client
     Result = Struct.new(:success, :code, :body, :error, :duration, :headers, keyword_init: true) do

@@ -15,7 +15,7 @@ module Angarium
     after_create_commit { DeliverJob.perform_later(id) }
 
     # Recover deliveries stranded in "delivering": a worker set the state to
-    # "delivering" (in #deliver!) but died — crash, deploy, OOM — before
+    # "delivering" (in #deliver!) but died (crash, deploy, OOM) before
     # recording the attempt or rescheduling, so the job's `pending?` guard never
     # re-runs it. Anything still "delivering" whose last attempt started before
     # `older_than.ago` is presumed abandoned and reset to "pending" + re-enqueued.
@@ -52,7 +52,7 @@ module Angarium
       end
 
       # Fail closed: our resolver is the single source of truth. If we can't
-      # resolve the host, do NOT let HTTPX resolve it unvalidated — record a
+      # resolve the host, do NOT let HTTPX resolve it unvalidated; record a
       # retryable failure. A transient DNS blip is retried; a persistently
       # unresolvable host eventually exhausts.
       if addresses.empty?
@@ -121,7 +121,7 @@ module Angarium
 
     # HTTP 410 Gone: the receiver is explicitly done with this endpoint. Per the
     # Standard Webhooks guidance, disable the endpoint (no further deliveries) and
-    # mark this delivery terminal — no retries.
+    # mark this delivery terminal, with no retries.
     def handle_gone!
       update!(state: "gone", next_attempt_at: nil)
       endpoint.disable!(reason: :gone)
@@ -139,7 +139,7 @@ module Angarium
         wait = jittered(base)
         # Honor Retry-After only when it asks us to wait LONGER than our own
         # backoff: take the later of the two. A receiver must never be able to
-        # pull retries EARLIER than our schedule — otherwise a malicious or
+        # pull retries EARLIER than our schedule; otherwise a malicious or
         # misconfigured receiver could send a tiny Retry-After to defeat our
         # backoff and make us hammer it. Retry-After can delay, never expedite.
         wait = [wait, retry_after].max if retry_after

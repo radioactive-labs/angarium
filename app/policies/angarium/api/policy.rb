@@ -8,7 +8,7 @@ module Angarium
     # controller's context, so `current_user`, `params`, and `controller` are
     # available.
     #
-    # Every action defaults to allowed — the endpoint scope already isolates
+    # Every action defaults to allowed; the endpoint scope already isolates
     # records to the current user, so subclass and override to *restrict* (e.g. a
     # read-only role, or admin-only deletes). Return truthy to permit, falsey to
     # get a 403.

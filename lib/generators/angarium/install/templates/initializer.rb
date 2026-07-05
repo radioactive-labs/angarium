@@ -43,7 +43,7 @@ Angarium.configure do |config|
   # valid (deliveries are signed with both), so receivers can roll over with no downtime.
   # config.signing_secret_grace_period = 24.hours
 
-  # Notification callbacks — fire on terminal delivery events so you can alert
+  # Notification callbacks fire on terminal delivery events so you can alert
   # consumers out of band (email, Slack, PagerDuty). A raised callback is logged
   # and swallowed, so it never breaks delivery.
   # config.on_delivery_exhausted = ->(delivery) { }         # retry schedule exhausted

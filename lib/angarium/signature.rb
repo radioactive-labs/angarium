@@ -5,7 +5,7 @@ module Angarium
   module Signature
     module_function
 
-    # secret may be a String or Array of secrets (dual-secret rotation grace) —
+    # secret may be a String or Array of secrets (dual-secret rotation grace);
     # produces one `v1,<base64>` token per secret, space-delimited.
     def sign(payload:, id:, timestamp:, secret:)
       Array(secret).map { |s| "v1,#{signature_for(s, id, timestamp, payload)}" }.join(" ")
