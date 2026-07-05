@@ -119,7 +119,7 @@ plaintext, so deliver it to receivers over a secure channel.
 
 ### Rotating a signing secret (zero-downtime)
 
-Rotate a secret with `endpoint.regenerate_signing_secret!` (returns the new
+Rotate a secret with `endpoint.rotate_signing_secret!` (returns the new
 plaintext). During a grace window (`config.signing_secret_grace_period`, default
 `24.hours`) every delivery is signed with **both** the new and the previous
 secret — the `webhook-signature` header carries multiple space-delimited `v1,`
@@ -213,15 +213,16 @@ reset to `pending`. Keep the timeout well above a single attempt's worst case
 (`open_timeout + http_timeout`) so a slow-but-alive worker isn't reaped; a
 redelivery is at-least-once-safe either way. Set it to `nil` to disable reaping.
 
-### Sending a test event
+### Pinging an endpoint
 
-Verify an endpoint end-to-end by delivering a synthetic `angarium.test` event
-(subscription matching is bypassed — a test event is always sent):
+Verify an endpoint end-to-end by delivering a synthetic `angarium.ping` event
+(subscription matching is bypassed — a ping is always sent). Returns the
+`Angarium::Delivery`, so you can reload it to inspect the outcome:
 
 ```ruby
-delivery = endpoint.send_test_event!
-# optionally: endpoint.send_test_event!(message: "hello")
-endpoint.ping! # alias of send_test_event!
+delivery = endpoint.ping!
+# optionally: endpoint.ping!(message: "hello")
+delivery.reload.succeeded? # => true once delivered
 ```
 
 ### At-least-once delivery
@@ -382,7 +383,7 @@ The specifics receivers use to decide whether to trust a webhook sender:
   persisted in an `exhausted` state (not deleted), and every attempt is recorded
   as an `Angarium::DeliveryAttempt` (response code, body, error, duration).
   Re-send any delivery manually with `delivery.redeliver!`.
-- **Zero-downtime secret rotation.** `endpoint.regenerate_signing_secret!` keeps
+- **Zero-downtime secret rotation.** `endpoint.rotate_signing_secret!` keeps
   the previous secret valid for `config.signing_secret_grace_period` (default
   24h); requests during that window are signed under both secrets, so receivers
   roll over without dropping a webhook.

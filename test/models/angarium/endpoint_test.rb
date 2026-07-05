@@ -101,10 +101,10 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     assert_includes endpoint.errors[:url].join, "disallowed"
   end
 
-  test "regenerate_signing_secret! rotates and persists a new secret" do
+  test "rotate_signing_secret! rotates and persists a new secret" do
     endpoint = build.tap(&:save!)
     old = endpoint.signing_secret
-    returned = endpoint.regenerate_signing_secret!
+    returned = endpoint.rotate_signing_secret!
 
     refute_equal old, endpoint.signing_secret
     assert_equal endpoint.signing_secret, returned
@@ -164,10 +164,10 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     assert build(custom_headers: { "Authorization" => "Bearer x" }).valid?
   end
 
-  test "regenerate_signing_secret! records the previous secret and rotation time" do
+  test "rotate_signing_secret! records the previous secret and rotation time" do
     endpoint = build.tap(&:save!)
     old = endpoint.signing_secret
-    endpoint.regenerate_signing_secret!
+    endpoint.rotate_signing_secret!
 
     assert_equal old, endpoint.previous_signing_secret
     assert endpoint.secret_rotated_at.present?
@@ -176,7 +176,7 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
   test "active_signing_secrets includes the previous secret only within grace" do
     endpoint = build.tap(&:save!)
     old = endpoint.signing_secret
-    new = endpoint.regenerate_signing_secret!
+    new = endpoint.rotate_signing_secret!
 
     assert_equal [new, old], endpoint.active_signing_secrets
 

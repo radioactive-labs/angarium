@@ -23,7 +23,7 @@
   resolver-divergence gap.
 - Endpoint `signing_secret` is encrypted at rest with Active Record Encryption
   (requires the host app to configure encryption keys).
-- `Endpoint#regenerate_signing_secret!` to rotate an endpoint's signing secret.
+- `Endpoint#rotate_signing_secret!` to rotate an endpoint's signing secret.
 - Endpoint URL/SSRF validation re-runs when `url`, `allow_private_network`, or
   `allowed_networks` change (and skips the DNS lookup on unrelated updates).
 - Configurable `config.primary_key_type` for Angarium's own tables (defaults
@@ -41,11 +41,11 @@
   `config.respect_retry_after`.
 - Per-endpoint `custom_headers` sent with every delivery (the signature header
   always takes precedence).
-- `Endpoint#send_test_event!` delivers a synthetic `angarium.test` event,
-  bypassing subscription matching.
+- `Endpoint#ping!` delivers a synthetic `angarium.ping` event, bypassing
+  subscription matching; returns the `Angarium::Delivery`.
 - Additive positive backoff jitter (`config.retry_jitter`) to avoid retry
   stampedes.
-- Dual-secret rotation grace: after `regenerate_signing_secret!`, deliveries are
+- Dual-secret rotation grace: after `rotate_signing_secret!`, deliveries are
   signed with both the new and previous secret for
   `config.signing_secret_grace_period`, and `Signature.verify` accepts any
   signature in the header, enabling zero-downtime secret rollover.

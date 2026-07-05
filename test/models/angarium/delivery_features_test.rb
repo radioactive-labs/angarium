@@ -194,36 +194,28 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     assert delivery.reload.delivering?
   end
 
-  # --- Test event -------------------------------------------------------------
+  # --- Ping -------------------------------------------------------------------
 
-  test "send_test_event! creates a delivery, enqueues, and delivers to the endpoint" do
-    delivery = nil
-    assert_enqueued_with(job: Angarium::DeliverJob) do
-      delivery = @endpoint.send_test_event!
-    end
-    assert_equal "angarium.test", delivery.event.name
-    assert_equal @endpoint, delivery.endpoint
-
-    fake = succeeding_client
-    Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
-    assert fake.requested?, "expected the test event to be delivered"
-    assert_equal @endpoint.url, fake.last.url
-  end
-
-  test "ping! is an alias of send_test_event!" do
+  test "ping! creates an angarium.ping delivery, enqueues, and delivers to the endpoint" do
     delivery = nil
     assert_enqueued_with(job: Angarium::DeliverJob) do
       delivery = @endpoint.ping!
     end
-    assert_equal "angarium.test", delivery.event.name
+    assert_kind_of Angarium::Delivery, delivery
+    assert_equal "angarium.ping", delivery.event.name
     assert_equal @endpoint, delivery.endpoint
+
+    fake = succeeding_client
+    Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
+    assert fake.requested?, "expected the ping to be delivered"
+    assert_equal @endpoint.url, fake.last.url
   end
 
   # --- Dual-secret rotation ---------------------------------------------------
 
   test "within the grace window a delivery verifies with both old and new secrets" do
     old_secret = @endpoint.signing_secret
-    new_secret = @endpoint.regenerate_signing_secret!
+    new_secret = @endpoint.rotate_signing_secret!
     refute_equal old_secret, new_secret
 
     fake = succeeding_client
@@ -246,7 +238,7 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
 
   test "past the grace window only the new secret verifies" do
     old_secret = @endpoint.signing_secret
-    new_secret = @endpoint.regenerate_signing_secret!
+    new_secret = @endpoint.rotate_signing_secret!
     @endpoint.update!(secret_rotated_at: 2.days.ago)
 
     fake = succeeding_client

@@ -62,7 +62,7 @@ module Angarium
     # The previous secret stays valid for `config.signing_secret_grace_period`
     # (deliveries are signed with both during that window), so receivers can
     # roll over to the new secret with zero downtime.
-    def regenerate_signing_secret!
+    def rotate_signing_secret!
       update!(
         previous_signing_secret: signing_secret,
         signing_secret: self.class.generate_signing_secret,
@@ -86,14 +86,14 @@ module Angarium
       update!(attrs)
     end
 
-    # Deliver a synthetic event to this endpoint, bypassing subscription
-    # matching (a test event is always sent). Returns the created delivery,
-    # whose after_create_commit enqueues the DeliverJob.
-    def send_test_event!(payload = { message: "Angarium test event" })
-      event = Angarium::Event.create!(name: "angarium.test", payload: payload)
+    # Deliver a synthetic `angarium.ping` event to this endpoint, bypassing
+    # subscription matching (a ping is always sent). Returns the created
+    # Angarium::Delivery, whose after_create_commit enqueues the DeliverJob —
+    # reload it to inspect the outcome.
+    def ping!(payload = { message: "Angarium ping" })
+      event = Angarium::Event.create!(name: "angarium.ping", payload: payload)
       deliveries.create!(event: event)
     end
-    alias_method :ping!, :send_test_event!
 
     private
 
