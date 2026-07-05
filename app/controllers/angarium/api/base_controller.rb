@@ -29,9 +29,15 @@ module Angarium
         angarium_render_unauthorized unless angarium_current_user
       end
 
-      # The endpoints this user may see/act on.
+      # The policy for this request (config.policy_class), holding scope,
+      # create-owner, and per-action permissions.
+      def angarium_policy(record = nil)
+        Angarium.config.policy_class.to_s.constantize.new(self, record)
+      end
+
+      # The endpoints this user may see/act on (from the policy).
       def endpoint_scope
-        Angarium.config.endpoint_scope.call(angarium_current_user)
+        angarium_policy.scope
       end
 
       # A delivery whose endpoint is within the caller's scope, or 404.
@@ -39,13 +45,9 @@ module Angarium
         Angarium::Delivery.where(endpoint_id: endpoint_scope.select(:id)).find(id)
       end
 
-      # Guard the current action with the configured policy (no-op if unset).
+      # Guard the current action with the policy's `<action>?` predicate.
       def authorize!(record = nil)
-        klass = Angarium.config.policy_class
-        return unless klass
-
-        policy = klass.to_s.constantize.new(self, record)
-        raise Angarium::Api::NotAuthorized unless policy.public_send("#{action_name}?")
+        raise Angarium::Api::NotAuthorized unless angarium_policy(record).public_send("#{action_name}?")
       end
 
       def paginate(relation)

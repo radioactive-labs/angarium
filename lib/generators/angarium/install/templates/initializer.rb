@@ -56,14 +56,9 @@ Angarium.configure do |config|
   # Resolve the current user from the controller (your current-user convention).
   # config.current_user = ->(controller) { controller.current_user }
 
-  # The endpoints a user may see/act on (deliveries/attempts scope through them).
-  # config.endpoint_scope = ->(current_user) { Angarium::Endpoint.where(owner: current_user) }
-
-  # Owner for a newly-created endpoint. Default: the current user. Override to let
-  # an admin create on behalf of another owner (authorize it in policy #create?).
-  # config.resolve_owner = ->(controller) { controller.current_user }
-
-  # Optional per-action authorization policy (subclass Angarium::Api::Policy).
-  # nil = allow every action within the scope above.
+  # Authorization, all in one class: #scope (what a user may see), #create_owner
+  # (who a new endpoint belongs to), and #<action>? predicates. Subclass
+  # Angarium::Api::Policy and override only what you need. Defaults are permissive
+  # and single-owner (you see and manage your own endpoints).
   # config.policy_class = "WebhookEndpointPolicy"
 end

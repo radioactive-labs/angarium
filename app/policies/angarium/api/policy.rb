@@ -1,21 +1,21 @@
 module Angarium
   module Api
-    # Base authorization policy for the JSON API.
+    # The single place for API authorization:
+    #   #scope         which endpoints this user may see and act on
+    #   #create_owner  who a newly-created endpoint belongs to
+    #   #<action>?     whether each action is allowed
     #
-    # Angarium instantiates `config.policy_class` per request with the controller
-    # and the record the action targets (an Endpoint, a Delivery, or nil for
-    # collection actions), then calls `<action_name>?`. It runs in the
-    # controller's context, so `current_user`, `params`, and `controller` are
-    # available.
+    # Angarium instantiates config.policy_class per request with the controller
+    # and (for member actions) the target record, and runs it in the controller's
+    # context, so `current_user`, `params`, and `controller` are available.
     #
-    # Every action defaults to allowed; the endpoint scope already isolates
-    # records to the current user, so subclass and override to *restrict* (e.g. a
-    # read-only role, or admin-only deletes). Return truthy to permit, falsey to
-    # get a 403.
+    # Defaults are permissive and single-owner: you see and create your own
+    # endpoints and may do anything to them. Subclass and override to change the
+    # scope, support multi-tenancy or admin-on-behalf-of, or restrict actions.
     class Policy
       attr_reader :controller, :record
 
-      def initialize(controller, record)
+      def initialize(controller, record = nil)
         @controller = controller
         @record = record
       end
@@ -23,22 +23,29 @@ module Angarium
       def current_user = controller.angarium_current_user
       def params = controller.params
 
+      # Endpoints this user may see and act on. Reads and finds go through this;
+      # deliveries and attempts scope through their endpoint.
+      def scope
+        Angarium::Endpoint.where(owner: current_user)
+      end
+
+      # Owner assigned to a newly-created endpoint. Override to let an admin
+      # create on behalf of another owner (e.g. read a param), then gate who may
+      # do so in #create? via `record.owner`.
+      def create_owner
+        current_user
+      end
+
       def index? = true
       def show? = true
-      # On create, `record` is the unsaved endpoint with its owner already
-      # assigned (from config.resolve_owner), so you can authorize the target
-      # owner here, e.g. `record.owner == current_user`.
       def create? = true
       def update? = true
       def destroy? = true
 
-      # Endpoint member actions default to the same capability as update?.
       def rotate_secret? = update?
       def pause? = update?
       def enable? = update?
       def ping? = update?
-
-      # Delivery actions.
       def redeliver? = update?
     end
   end

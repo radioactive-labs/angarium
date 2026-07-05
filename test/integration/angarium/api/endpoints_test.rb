@@ -1,5 +1,10 @@
 require "test_helper"
 
+# Resolves the create-owner from a param (admin acting on behalf of another owner).
+class DelegatingPolicy < Angarium::Api::Policy
+  def create_owner = Owner.find(params[:owner_id])
+end
+
 class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
   setup do
     @owner = Owner.create!(name: "Acme")
@@ -10,15 +15,6 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
   end
 
   def auth(owner) = { "X-Owner-Id" => owner.id.to_s }
-
-  # Minitest's stub auto-invokes a Proc value, so set callable config directly.
-  def with_config(attr, value)
-    previous = Angarium.config.public_send(attr)
-    Angarium.config.public_send("#{attr}=", value)
-    yield
-  ensure
-    Angarium.config.public_send("#{attr}=", previous)
-  end
 
   test "requires authentication" do
     get "/angarium/endpoints"
@@ -56,10 +52,8 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     assert_equal @owner, Angarium::Endpoint.find(body["id"]).owner
   end
 
-  test "resolve_owner lets an admin create on behalf of another owner" do
-    # A host resolver that reads a param to act on behalf of another owner. Real
-    # apps gate who may do this in policy #create? (record.owner is available).
-    with_config(:resolve_owner, ->(controller) { Owner.find(controller.params[:owner_id]) }) do
+  test "a policy's create_owner can create on behalf of another owner" do
+    Angarium.config.stub(:policy_class, "DelegatingPolicy") do
       post "/angarium/endpoints",
         params: { owner_id: @other.id,
                   endpoint: { name: "Deleg", url: "https://203.0.113.40/hook", subscribed_events: ["*"] } },

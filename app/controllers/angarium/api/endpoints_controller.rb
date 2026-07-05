@@ -15,11 +15,10 @@ module Angarium
       end
 
       def create
-        # The owner comes from config.resolve_owner (default: current_user), not
-        # the read scope, so an admin can create on behalf of another owner. The
-        # owner is set before authorize!, so policy #create? sees record.owner.
+        # The owner comes from the policy's #create_owner (default: current_user),
+        # set before authorize! so policy #create? can gate the target owner.
         endpoint = Angarium::Endpoint.new(endpoint_params)
-        endpoint.owner = Angarium.config.resolve_owner.call(self)
+        endpoint.owner = angarium_policy.create_owner
         authorize!(endpoint)
         endpoint.save!
         # The signing secret is revealed once, on creation.

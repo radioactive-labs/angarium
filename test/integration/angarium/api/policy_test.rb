@@ -14,9 +14,16 @@ class DenyAcmePolicy < Angarium::Api::Policy
   def show? = current_user.name != "Acme"
 end
 
-# create? inspects the resolved target owner on the unsaved record.
-class OwnEndpointsOnlyPolicy < Angarium::Api::Policy
+# Resolves the create-owner from a param, then gates who may act on behalf of
+# another owner in create? (record.owner is the resolved target).
+class DelegateOwnOnlyPolicy < Angarium::Api::Policy
+  def create_owner = Owner.find(params[:owner_id])
   def create? = record.owner == current_user
+end
+
+# A broad scope (multi-tenant admin who sees everything).
+class AllEndpointsPolicy < Angarium::Api::Policy
+  def scope = Angarium::Endpoint.all
 end
 
 class Angarium::Api::PolicyTest < ActionDispatch::IntegrationTest
@@ -29,14 +36,6 @@ class Angarium::Api::PolicyTest < ActionDispatch::IntegrationTest
   end
 
   def auth = { "X-Owner-Id" => @owner.id.to_s }
-
-  def with_config(attr, value)
-    previous = Angarium.config.public_send(attr)
-    Angarium.config.public_send("#{attr}=", value)
-    yield
-  ensure
-    Angarium.config.public_send("#{attr}=", previous)
-  end
 
   test "policy permits reads and forbids writes and member actions" do
     Angarium.config.stub(:policy_class, "ReadOnlyPolicy") do
@@ -67,19 +66,33 @@ class Angarium::Api::PolicyTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "create? authorizes the resolved target owner" do
-    with_config(:resolve_owner, ->(controller) { Owner.find(controller.params[:owner_id]) }) do
-      Angarium.config.stub(:policy_class, "OwnEndpointsOnlyPolicy") do
-        post "/angarium/endpoints",
-          params: { owner_id: @other.id, endpoint: { name: "n", url: "https://203.0.113.20/h" } },
-          headers: auth, as: :json
-        assert_response :forbidden, "creating for another owner should be denied"
+  test "create_owner and create? together gate acting on behalf of another owner" do
+    Angarium.config.stub(:policy_class, "DelegateOwnOnlyPolicy") do
+      post "/angarium/endpoints",
+        params: { owner_id: @other.id, endpoint: { name: "n", url: "https://203.0.113.20/h" } },
+        headers: auth, as: :json
+      assert_response :forbidden, "creating for another owner should be denied"
 
-        post "/angarium/endpoints",
-          params: { owner_id: @owner.id, endpoint: { name: "n", url: "https://203.0.113.21/h" } },
-          headers: auth, as: :json
-        assert_response :created, "creating for yourself should be allowed"
-      end
+      post "/angarium/endpoints",
+        params: { owner_id: @owner.id, endpoint: { name: "n", url: "https://203.0.113.21/h" } },
+        headers: auth, as: :json
+      assert_response :created, "creating for yourself should be allowed"
+    end
+  end
+
+  test "policy #scope controls which endpoints are visible" do
+    other_endpoint = @other.webhook_endpoints.create!(
+      name: "x", url: "https://203.0.113.50/h", subscribed_events: ["*"]
+    )
+
+    # Default policy scopes to the current user: another owner's endpoint is a 404.
+    get "/angarium/endpoints/#{other_endpoint.id}", headers: auth
+    assert_response :not_found
+
+    # A policy with a broad scope can see it.
+    Angarium.config.stub(:policy_class, "AllEndpointsPolicy") do
+      get "/angarium/endpoints/#{other_endpoint.id}", headers: auth
+      assert_response :ok
     end
   end
 end
