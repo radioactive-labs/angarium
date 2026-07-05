@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/radioactive-labs/angarium/actions/workflows/ci.yml/badge.svg)](https://github.com/radioactive-labs/angarium/actions/workflows/ci.yml)
 [![Standard Webhooks](https://img.shields.io/badge/Standard%20Webhooks-compliant-3068b7)](https://www.standardwebhooks.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](MIT-LICENSE)
 
 **Everything your hand-rolled webhook job is missing**: HMAC signing, retries
 with backoff, zero-downtime secret rotation, SSRF protection, and a queryable log
@@ -688,6 +689,32 @@ via issue or PR.</sub>
   [bullet_train-outgoing_webhooks](https://rubygems.org/gems/bullet_train-outgoing_webhooks),
   which integrates with its team and account model.
 
+## Development
+
+After cloning the repo, install dependencies and generate the per-Rails-version
+gemfiles:
+
+```bash
+bundle install
+bundle exec appraisal install   # writes gemfiles/*.gemfile for each Rails version
+```
+
+Tests run through a `test/dummy` app against the supported Rails versions via
+[Appraisal](https://github.com/thoughtbot/appraisal) (there is no `rake test`
+task; the runner is `bin/rails test`):
+
+```bash
+bundle exec appraisal bin/rails test               # all Rails versions
+bundle exec appraisal rails-8.1 bin/rails test     # a single version
+bin/rails test                                     # just your default bundle
+bin/rails test test/lib/angarium/signature_test.rb # a single file
+```
+
+Available appraisals: `rails-7.1`, `rails-7.2`, `rails-8.0`, `rails-8.1`. CI runs
+the same matrix across Ruby 3.2 and 3.3 (8 jobs). After changing a dependency or
+the `Appraisals` file, re-run `bundle exec appraisal install` and commit the
+updated `gemfiles/`.
+
 ## License
 
-MIT.
+Angarium is released under the [MIT License](MIT-LICENSE).
