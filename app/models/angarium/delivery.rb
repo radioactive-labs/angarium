@@ -2,17 +2,17 @@ require "uri"
 
 module Angarium
   class Delivery < ApplicationRecord
-    STATES = %w[pending delivering succeeded exhausted blocked gone].freeze
+    # Delivery lifecycle. Terminal: succeeded, exhausted, blocked (SSRF), gone (410).
+    enum :state, {
+      pending: "pending", delivering: "delivering", succeeded: "succeeded",
+      exhausted: "exhausted", blocked: "blocked", gone: "gone"
+    }, default: :pending
 
     belongs_to :event, class_name: "Angarium::Event"
     belongs_to :endpoint, class_name: "Angarium::Endpoint"
     has_many :delivery_attempts, class_name: "Angarium::DeliveryAttempt", dependent: :destroy
 
     after_create_commit { DeliverJob.perform_later(id) }
-
-    STATES.each do |state_name|
-      define_method("#{state_name}?") { state == state_name }
-    end
 
     # Recover deliveries stranded in "delivering": a worker set the state to
     # "delivering" (in #deliver!) but died — crash, deploy, OOM — before

@@ -46,6 +46,19 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     assert_equal plaintext, endpoint.reload.signing_secret, "must decrypt transparently on read"
   end
 
+  test "custom_headers is encrypted at rest (may carry a bearer token) and decrypts transparently" do
+    endpoint = build(custom_headers: { "Authorization" => "Bearer s3kret" }).tap(&:save!)
+
+    raw = ActiveRecord::Base.connection_pool.with_connection do |c|
+      c.select_value("SELECT custom_headers FROM angarium_endpoints WHERE id = #{endpoint.id}")
+    end
+    refute_includes raw.to_s, "Bearer s3kret", "the bearer token must not be stored in plaintext"
+    assert_includes raw.to_s, "\"p\":", "expected Active Record Encryption envelope in the DB"
+
+    assert_equal({ "Authorization" => "Bearer s3kret" }, endpoint.reload.custom_headers,
+      "must decrypt transparently on read")
+  end
+
   test "requires https" do
     endpoint = build(url: "http://example.test/hook")
     refute endpoint.valid?

@@ -14,7 +14,11 @@ module Angarium
     belongs_to :owner, polymorphic: true
     has_many :deliveries, class_name: "Angarium::Delivery", dependent: :destroy
 
+    # Encrypted at rest: the signing secret(s) and custom_headers — the latter
+    # commonly carries a receiver credential (e.g. an Authorization bearer token),
+    # so it gets the same protection as the signing secret.
     encrypts :signing_secret, :previous_signing_secret
+    encrypts :custom_headers
 
     # Lifecycle status. `enabled` endpoints receive deliveries; the rest don't.
     #   paused   — turned off manually (resumable via #enable!)

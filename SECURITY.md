@@ -36,8 +36,10 @@ security guarantees — and the surfaces you can hold us to — are:
 - **Connect-time IP pinning.** Deliveries pin the connection to the validated
   resolved address, closing the DNS-rebinding window between resolution and
   connect (TLS SNI and certificate verification still use the original hostname).
-- **Encrypted signing secrets.** Endpoint signing secrets (current and
-  in-rotation previous) are encrypted at rest with Active Record Encryption.
+- **Encrypted secrets at rest.** Endpoint signing secrets (current and
+  in-rotation previous) and `custom_headers` (which commonly carries a receiver
+  credential such as an Authorization bearer token) are encrypted at rest with
+  Active Record Encryption.
 - **Standard Webhooks HMAC signing.** Requests are signed per the
   [Standard Webhooks](https://www.standardwebhooks.com) spec (HMAC-SHA256 over
   `{id}.{timestamp}.{body}`) with a timestamp tolerance enforced on verification

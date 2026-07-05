@@ -40,7 +40,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_04_000101) do
     t.json "allowed_networks", default: [], null: false
     t.integer "consecutive_failures", default: 0, null: false
     t.datetime "created_at", null: false
-    t.json "custom_headers", default: {}, null: false
+    t.json "custom_headers"
     t.string "name", null: false
     t.string "owner_id", null: false
     t.string "owner_type", null: false

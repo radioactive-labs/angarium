@@ -23,8 +23,9 @@
 - Delivery fails closed on hosts it can't resolve (never falls back to an
   unvalidated HTTPX resolution), fully closing the DNS-rebinding
   resolver-divergence gap.
-- Endpoint `signing_secret` is encrypted at rest with Active Record Encryption
-  (requires the host app to configure encryption keys).
+- Endpoint `signing_secret` and `custom_headers` are encrypted at rest with
+  Active Record Encryption (custom_headers commonly carries a receiver credential
+  such as a bearer token). Requires the host app to configure encryption keys.
 - `Endpoint#rotate_signing_secret!` to rotate an endpoint's signing secret.
 - Endpoint URL/SSRF validation re-runs when `url`, `allow_private_network`, or
   `allowed_networks` change (and skips the DNS lookup on unrelated updates).

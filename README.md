@@ -29,8 +29,8 @@ bin/rails g angarium:install
 
 ### Required: Active Record Encryption
 
-Angarium encrypts each endpoint's `signing_secret` at rest. Configure Active
-Record Encryption keys before using the gem:
+Angarium encrypts each endpoint's `signing_secret` and `custom_headers` at rest.
+Configure Active Record Encryption keys before using the gem:
 
 ```bash
 bin/rails db:encryption:init
@@ -145,10 +145,12 @@ expects) to every request from an endpoint:
 endpoint.update!(custom_headers: { "Authorization" => "Bearer abc123" })
 ```
 
-`custom_headers` must be a hash of string keys and values. The `webhook-id`,
-`webhook-timestamp`, and `webhook-signature` headers always win, so a custom
-header can never override or spoof them. In the same spirit, reserved and
-transport headers (`webhook-id`, `webhook-timestamp`, `webhook-signature`,
+`custom_headers` must be a hash of string keys and values. Because it commonly
+carries a receiver credential (like the bearer token above), it's **encrypted at
+rest** with Active Record Encryption, same as the signing secret. The
+`webhook-id`, `webhook-timestamp`, and `webhook-signature` headers always win, so
+a custom header can never override or spoof them. In the same spirit, reserved
+and transport headers (`webhook-id`, `webhook-timestamp`, `webhook-signature`,
 `host`, `content-length`, `content-type`, `transfer-encoding`, `connection`)
 are rejected at validation (case-insensitively) and can't be overridden.
 
