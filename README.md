@@ -185,9 +185,13 @@ at once don't retry in lockstep and stampede the receiver.
 ### Retry-After
 
 When a failed response carries a `Retry-After` header (seconds or an HTTP-date),
-Angarium honors it for the next attempt instead of the schedule's delay. This is
-capped at `config.max_retry_after` (default `3600` seconds) and can be turned off
-with `config.respect_retry_after = false`.
+Angarium honors it — but only when it asks for a **longer** wait than the
+scheduled backoff. It takes the later of the two, so a receiver's `Retry-After`
+can *delay* the next attempt but never pull it *earlier* than our schedule. This
+keeps a malicious or misconfigured receiver from using a tiny `Retry-After` to
+defeat our backoff and make us retry aggressively. The honored value is capped at
+`config.max_retry_after` (default `3600` seconds), and the whole behavior can be
+disabled with `config.respect_retry_after = false`.
 
 ### Manual redelivery
 

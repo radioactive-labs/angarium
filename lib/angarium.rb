@@ -38,7 +38,7 @@ module Angarium
 
       callback.call(*args)
     rescue => e
-      Rails.logger.warn { "[Angarium] #{callback_name} callback raised: #{e.class}: #{e.message}" }
+      Rails.logger.error { "[Angarium] #{callback_name} callback raised: #{e.class}: #{e.message}" }
     end
   end
 end

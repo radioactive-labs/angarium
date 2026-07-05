@@ -136,7 +136,13 @@ module Angarium
         endpoint.record_delivery_failure!
         Angarium.notify(:on_delivery_exhausted, self)
       else
-        wait = retry_after || jittered(base)
+        wait = jittered(base)
+        # Honor Retry-After only when it asks us to wait LONGER than our own
+        # backoff: take the later of the two. A receiver must never be able to
+        # pull retries EARLIER than our schedule — otherwise a malicious or
+        # misconfigured receiver could send a tiny Retry-After to defeat our
+        # backoff and make us hammer it. Retry-After can delay, never expedite.
+        wait = [wait, retry_after].max if retry_after
         update!(state: "pending", next_attempt_at: Time.current + wait)
         DeliverJob.set(wait: wait).perform_later(id)
       end

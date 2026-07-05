@@ -95,6 +95,20 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     end
   end
 
+  test "ignores a Retry-After sooner than the scheduled backoff (no expedited retries)" do
+    freeze_time do
+      Angarium.config.stub(:retry_schedule, [300]) do
+        create_delivery.deliver!(client: failing_client(headers: { "retry-after" => "10" }))
+      end
+      delivery = Angarium::Delivery.last
+      assert delivery.pending?
+      # 10s < our 300s backoff, so Retry-After can't pull the retry earlier; we
+      # keep the schedule (jittered up to +15%).
+      assert_operator delivery.next_attempt_at, :>=, Time.current + 300
+      assert_operator delivery.next_attempt_at, :<=, Time.current + 300 * 1.15 + 1
+    end
+  end
+
   test "ignores Retry-After when respect_retry_after is false" do
     freeze_time do
       Angarium.config.stub(:respect_retry_after, false) do
