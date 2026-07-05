@@ -11,6 +11,15 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
 
   def auth(owner) = { "X-Owner-Id" => owner.id.to_s }
 
+  # Minitest's stub auto-invokes a Proc value, so set callable config directly.
+  def with_config(attr, value)
+    previous = Angarium.config.public_send(attr)
+    Angarium.config.public_send("#{attr}=", value)
+    yield
+  ensure
+    Angarium.config.public_send("#{attr}=", previous)
+  end
+
   test "requires authentication" do
     get "/angarium/endpoints"
     assert_response :unauthorized
@@ -35,7 +44,7 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "create sets the owner from the scope and reveals the secret once" do
+  test "create owns to the current user by default and reveals the secret once" do
     assert_difference -> { @owner.webhook_endpoints.count }, 1 do
       post "/angarium/endpoints",
         params: { endpoint: { name: "New", url: "https://203.0.113.20/hook", subscribed_events: ["invoice.*"] } },
@@ -45,6 +54,19 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     body = JSON.parse(response.body)["endpoint"]
     assert body["signing_secret"].to_s.start_with?("whsec_"), "create should reveal the signing secret"
     assert_equal @owner, Angarium::Endpoint.find(body["id"]).owner
+  end
+
+  test "resolve_owner lets an admin create on behalf of another owner" do
+    # A host resolver that reads a param to act on behalf of another owner. Real
+    # apps gate who may do this in policy #create? (record.owner is available).
+    with_config(:resolve_owner, ->(controller) { Owner.find(controller.params[:owner_id]) }) do
+      post "/angarium/endpoints",
+        params: { owner_id: @other.id,
+                  endpoint: { name: "Deleg", url: "https://203.0.113.40/hook", subscribed_events: ["*"] } },
+        headers: auth(@owner), as: :json
+    end
+    assert_response :created
+    assert_equal @other, Angarium::Endpoint.find(JSON.parse(response.body)["endpoint"]["id"]).owner
   end
 
   test "create with invalid params returns 422 with details" do

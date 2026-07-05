@@ -25,6 +25,9 @@ module Angarium
 
       def index? = true
       def show? = true
+      # On create, `record` is the unsaved endpoint with its owner already
+      # assigned (from config.resolve_owner), so you can authorize the target
+      # owner here, e.g. `record.owner == current_user`.
       def create? = true
       def update? = true
       def destroy? = true

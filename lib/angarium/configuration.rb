@@ -7,7 +7,8 @@ module Angarium
                   :max_retry_after, :retry_jitter, :signing_secret_grace_period,
                   :delivery_attempt_retention, :delivering_timeout,
                   :on_delivery_exhausted, :on_endpoint_disabled,
-                  :parent_controller, :current_user, :endpoint_scope, :policy_class
+                  :parent_controller, :current_user, :endpoint_scope,
+                  :resolve_owner, :policy_class
 
     def initialize
       @job_queue        = :default
@@ -43,6 +44,11 @@ module Angarium
       # The set of endpoints a user may see/act on. Deliveries and attempts are
       # scoped through their endpoint. Override for multi-tenancy.
       @endpoint_scope    = ->(current_user) { Angarium::Endpoint.where(owner: current_user) }
+      # Owner for a newly-created endpoint (POST /endpoints). Defaults to the
+      # current user (you create endpoints for yourself). Override to let an admin
+      # act on behalf of another owner by reading a param; policy #create? then
+      # authorizes the resolved owner (available as `record.owner`).
+      @resolve_owner     = ->(controller) { controller.angarium_current_user }
       # Optional per-action authorization policy (subclass Angarium::Api::Policy).
       # nil = allow every action within the scope above.
       @policy_class      = nil

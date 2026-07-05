@@ -11,7 +11,21 @@ module Angarium
       Array(secret).map { |s| "v1,#{signature_for(s, id, timestamp, payload)}" }.join(" ")
     end
 
-    def verify(payload:, id:, timestamp:, signature:, secret:, tolerance: 300, now: Time.now.to_i)
+    # Verify a Standard Webhooks signature. Pass the fields explicitly, or pass a
+    # Rails `request:` and Angarium pulls the raw body and webhook-* headers for
+    # you, so a receiver is a one-liner:
+    #
+    #   Angarium::Signature.verify(request:, secret: endpoint.signing_secret)
+    #
+    def verify(secret:, request: nil, payload: nil, id: nil, timestamp: nil, signature: nil,
+      tolerance: 300, now: Time.now.to_i)
+      if request
+        payload   ||= request.raw_post
+        id        ||= request.headers["webhook-id"]
+        timestamp ||= request.headers["webhook-timestamp"]
+        signature ||= request.headers["webhook-signature"]
+      end
+
       return false unless timestamp.to_s.match?(/\A\d+\z/)
       return false if (now - timestamp.to_i).abs > tolerance
 

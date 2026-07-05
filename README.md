@@ -115,7 +115,15 @@ The signature is `HMAC-SHA256(secret_key, "{webhook-id}.{webhook-timestamp}.{bod
 base64-encoded, where `secret_key` is the base64-decoded portion of the
 `whsec_`-prefixed `signing_secret`.
 
-You can verify with any Standard Webhooks library, or with Angarium's own helper:
+You can verify with any Standard Webhooks library, or with Angarium's own helper.
+Pass a Rails `request:` and it reads the raw body and `webhook-*` headers for you:
+
+```ruby
+Angarium::Signature.verify(request: request, secret: endpoint.signing_secret)
+# => true / false
+```
+
+Or pass the fields explicitly:
 
 ```ruby
 Angarium::Signature.verify(
@@ -124,7 +132,7 @@ Angarium::Signature.verify(
   timestamp: request.headers["webhook-timestamp"],
   signature: request.headers["webhook-signature"],
   secret:    endpoint.signing_secret
-) # => true / false
+)
 ```
 
 `verify` also enforces a timestamp tolerance (default 300s) to resist replay.
@@ -328,8 +336,8 @@ Angarium.config.max_response_body_bytes = 4_096
 
 ## HTTP API
 
-Angarium ships an optional **headless JSON API** for managing endpoints and
-browsing deliveries. No HTML or UI, just JSON. Mount the engine wherever you
+Angarium ships an optional **JSON API** for managing endpoints and browsing
+deliveries. It has no HTML views or UI of its own. Mount the engine wherever you
 like:
 
 ```ruby
@@ -361,8 +369,18 @@ polymorphic owner; override for multi-tenancy:
 config.endpoint_scope = ->(user) { user.account.webhook_endpoints }
 ```
 
-Anything outside the scope is a `404`, and `create` sets the owner *from* the
-scope, so a user can't create an endpoint for anyone else.
+Anything outside the scope is a `404`. Creating an endpoint is separate: its
+owner comes from `config.resolve_owner` (default: the current user), so out of
+the box a user only creates endpoints for themselves. To let an admin create on
+behalf of another owner, resolve it from a request param, then authorize the
+target owner in the policy (`record.owner` is set before `create?` runs):
+
+```ruby
+config.resolve_owner = ->(controller) do
+  id = controller.params[:owner_id]
+  id ? Account.find(id) : controller.current_user
+end
+```
 
 ### Authorization
 
@@ -385,26 +403,51 @@ config.policy_class = "WebhookEndpointPolicy"
 Every action defaults to allowed (the scope already isolates data); override to
 restrict. A denied action returns `403`. Left `nil`, the policy check is skipped.
 
+### Objects
+
+Responses wrap these objects. `signing_secret` and `custom_headers` are never
+included (see the note below):
+
+```json
+// endpoint
+{ "id": 1, "name": "Production", "url": "https://example.com/webhooks",
+  "status": "enabled", "subscribed_events": ["invoice.*"], "allow_private_network": false,
+  "allowed_networks": [], "consecutive_failures": 0, "status_changed_at": null,
+  "created_at": "2026-07-04T12:00:00Z", "updated_at": "2026-07-04T12:00:00Z" }
+
+// delivery
+{ "id": 42, "endpoint_id": 1, "event": "invoice.paid", "state": "succeeded",
+  "attempt_count": 1, "next_attempt_at": null, "last_attempt_at": "2026-07-04T12:00:01Z",
+  "created_at": "2026-07-04T12:00:00Z", "updated_at": "2026-07-04T12:00:01Z" }
+
+// attempt
+{ "id": 7, "delivery_id": 42, "response_code": 200, "response_body": "ok",
+  "error": null, "duration": 0.12, "created_at": "2026-07-04T12:00:01Z" }
+```
+
 ### Routes
 
-| Method & path | Action |
-| --- | --- |
-| `GET    /endpoints` | list your endpoints |
-| `POST   /endpoints` | create (reveals the `signing_secret` once) |
-| `GET    /endpoints/:id` | show |
-| `PATCH  /endpoints/:id` | update |
-| `DELETE /endpoints/:id` | destroy |
-| `POST   /endpoints/:id/rotate_secret` | rotate the signing secret (returns the new one) |
-| `POST   /endpoints/:id/pause`, `/enable` | change status |
-| `POST   /endpoints/:id/ping` | send a test delivery |
-| `GET    /endpoints/:id/deliveries` | list an endpoint's deliveries |
-| `GET    /deliveries/:id` | show a delivery with its attempts |
-| `POST   /deliveries/:id/redeliver` | re-send a delivery |
-| `GET    /deliveries/:id/attempts` | list a delivery's attempts |
+| Method & path | Request body | Response |
+| --- | --- | --- |
+| `GET /endpoints` | none | `200 { "endpoints": [endpoint, ...] }` |
+| `POST /endpoints` | `{ "endpoint": { "name", "url", "subscribed_events": [...] } }` | `201 { "endpoint": {...endpoint, "signing_secret": "whsec_..."} }` |
+| `GET /endpoints/:id` | none | `200 { "endpoint": endpoint }` |
+| `PATCH /endpoints/:id` | `{ "endpoint": { "name": "New name" } }` | `200 { "endpoint": endpoint }` |
+| `DELETE /endpoints/:id` | none | `204` (no body) |
+| `POST /endpoints/:id/rotate_secret` | none | `200 { "endpoint": endpoint, "signing_secret": "whsec_..." }` |
+| `POST /endpoints/:id/pause`, `/enable` | none | `200 { "endpoint": endpoint }` |
+| `POST /endpoints/:id/ping` | none | `202 { "delivery": delivery }` |
+| `GET /endpoints/:id/deliveries` | none | `200 { "deliveries": [delivery, ...] }` |
+| `GET /deliveries/:id` | none | `200 { "delivery": delivery, "attempts": [attempt, ...] }` |
+| `POST /deliveries/:id/redeliver` | none | `202 { "delivery": delivery }` |
+| `GET /deliveries/:id/attempts` | none | `200 { "attempts": [attempt, ...] }` |
 
 The `signing_secret` is returned only by `create` and `rotate_secret`, never in
 any other response; `custom_headers` (which may hold a credential) is write-only
 and never echoed. Collection endpoints accept `?limit=` (max 200) and `?offset=`.
+Errors are JSON: `422 { "error": "validation failed", "details": [...] }` for an
+invalid body, plus `401` (unauthenticated), `403` (policy denied), and `404`
+(out of scope).
 
 ## Security (SSRF protection)
 
@@ -442,35 +485,29 @@ bypasses are already closed.
 
 ## Delivery guarantees
 
-The specifics receivers use to decide whether to trust a webhook sender:
+What Angarium actually promises about delivery, so a receiver knows what it can
+rely on:
 
-- **Signed, timestamped, replay-resistant.** Every request carries
-  `webhook-id`, `webhook-timestamp`, and `webhook-signature` headers per the
-  [Standard Webhooks](https://www.standardwebhooks.com) spec: HMAC-SHA256 over
-  `{id}.{timestamp}.{body}`, with a 5-minute timestamp tolerance enforced on
-  verification. Verify with the official `standardwebhooks` library in any
-  language, or `Angarium::Signature.verify`.
-- **Stable IDs for deduplication.** `webhook-id` is the delivery's ID (the same
-  value as the envelope's `id`) and is identical across every retry of that
-  delivery, but unique per *delivery*, not per event. Delivery is
-  **at-least-once**: dedupe on that ID and treat repeats as no-ops.
-- **Retries with backoff, jitter, and `Retry-After`.** Failures (non-2xx,
-  timeouts, connection errors) retry on `config.retry_schedule` (default: the
-  Standard Webhooks schedule, twelve retries over ~10 days), with +0-15% jitter;
-  a receiver's `Retry-After` header is honored (capped by `config.max_retry_after`).
-- **Nothing is silently dropped.** When retries are exhausted the delivery is
-  persisted in an `exhausted` state (not deleted), and every attempt is recorded
-  as an `Angarium::DeliveryAttempt` (response code, body, error, duration).
-  Re-send any delivery manually with `delivery.redeliver!`.
-- **Zero-downtime secret rotation.** `endpoint.rotate_signing_secret!` keeps
-  the previous secret valid for `config.signing_secret_grace_period` (default
-  24h); requests during that window are signed under both secrets, so receivers
-  roll over without dropping a webhook.
-- **Auto-disable dead endpoints (opt-in).** Set
-  `config.auto_disable_endpoint_after` to deactivate an endpoint after N
-  consecutive failed deliveries; a success resets the counter.
-- **Secrets encrypted at rest** with Active Record Encryption (current and
-  in-rotation previous secret).
+- **At-least-once, not exactly-once.** A delivery is retried until it succeeds or
+  the schedule is exhausted, so the same event can arrive more than once (for
+  example, a retry after your `200` was lost in transit). Every request carries a
+  `webhook-id` that stays constant across a delivery's retries: dedupe on it and
+  treat repeats as no-ops.
+- **No ordering.** Deliveries are independent jobs and each retries on its own
+  schedule, so events can arrive out of order. If order matters, put a sequence
+  number or timestamp in the payload and sort on the receiver.
+- **Durable; nothing is silently dropped.** Every attempt is persisted as an
+  `Angarium::DeliveryAttempt` (response code, body, error, duration), and a
+  delivery that exhausts its retries is kept in the `exhausted` state, not
+  deleted. You can always tell whether an event was delivered, and re-send with
+  `delivery.redeliver!`.
+- **Authenticated per request.** Every request is signed and timestamped per the
+  [Standard Webhooks](https://www.standardwebhooks.com) spec (HMAC-SHA256 over
+  `{id}.{timestamp}.{body}`, 5-minute tolerance), so a receiver can confirm it
+  came from you and reject replays, independent of transport.
+
+Secret rotation, SSRF protection, and encryption harden delivery but aren't
+delivery-semantics guarantees; they have their own sections above.
 
 ## Configuration
 
@@ -529,8 +566,8 @@ each is a small project:
   persists every attempt (response code, body, error, duration) and never
   silently drops a delivery.
 
-None of these is hard on its own. All of them, maintained, is a project. This is
-that project.
+None of these is hard on its own. Building and maintaining all of them together,
+as Rails and your receivers change, is the work Angarium takes off your plate.
 
 ## How Angarium compares
 

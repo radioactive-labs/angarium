@@ -59,6 +59,10 @@ Angarium.configure do |config|
   # The endpoints a user may see/act on (deliveries/attempts scope through them).
   # config.endpoint_scope = ->(current_user) { Angarium::Endpoint.where(owner: current_user) }
 
+  # Owner for a newly-created endpoint. Default: the current user. Override to let
+  # an admin create on behalf of another owner (authorize it in policy #create?).
+  # config.resolve_owner = ->(controller) { controller.current_user }
+
   # Optional per-action authorization policy (subclass Angarium::Api::Policy).
   # nil = allow every action within the scope above.
   # config.policy_class = "WebhookEndpointPolicy"

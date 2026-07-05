@@ -15,9 +15,11 @@ module Angarium
       end
 
       def create
-        # Building through the scope sets the owner (owner: current_user by
-        # default, or e.g. account.webhook_endpoints for a tenancy override).
-        endpoint = endpoint_scope.new(endpoint_params)
+        # The owner comes from config.resolve_owner (default: current_user), not
+        # the read scope, so an admin can create on behalf of another owner. The
+        # owner is set before authorize!, so policy #create? sees record.owner.
+        endpoint = Angarium::Endpoint.new(endpoint_params)
+        endpoint.owner = Angarium.config.resolve_owner.call(self)
         authorize!(endpoint)
         endpoint.save!
         # The signing secret is revealed once, on creation.

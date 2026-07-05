@@ -107,6 +107,30 @@ class Angarium::SignatureTest < ActiveSupport::TestCase
     refute Angarium::Signature.verify(payload: "body", id: "1", timestamp: 1_000, signature: sig, secret: c, now: 1_100)
   end
 
+  # A stand-in for a Rails request: responds to raw_post and headers[...].
+  def fake_request(body, id:, timestamp:, signature:)
+    Struct.new(:raw_post, :headers).new(
+      body, { "webhook-id" => id, "webhook-timestamp" => timestamp.to_s, "webhook-signature" => signature }
+    )
+  end
+
+  test "verify reads the raw body and webhook-* headers from a request" do
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: secret)
+
+    ok = fake_request("body", id: "1", timestamp: 1_000, signature: sig)
+    assert Angarium::Signature.verify(request: ok, secret: secret, now: 1_100)
+
+    tampered = fake_request("TAMPERED", id: "1", timestamp: 1_000, signature: sig)
+    refute Angarium::Signature.verify(request: tampered, secret: secret, now: 1_100)
+  end
+
+  test "explicit args override values pulled from a request" do
+    sig = Angarium::Signature.sign(payload: "body", id: "1", timestamp: 1_000, secret: secret)
+    req = fake_request("body", id: "1", timestamp: 1_000, signature: sig)
+    # An explicit (wrong) payload wins over request.raw_post.
+    refute Angarium::Signature.verify(request: req, payload: "OTHER", secret: secret, now: 1_100)
+  end
+
   test "parse keeps the base64 payload of each v1 token and drops others" do
     assert_equal ["abc", "def"], Angarium::Signature.parse("v1,abc v1,def")
     assert_equal ["abc"], Angarium::Signature.parse("v1,abc v2,def")
