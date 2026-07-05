@@ -3,13 +3,47 @@
 [![CI](https://github.com/radioactive-labs/angarium/actions/workflows/ci.yml/badge.svg)](https://github.com/radioactive-labs/angarium/actions/workflows/ci.yml)
 [![Standard Webhooks](https://img.shields.io/badge/Standard%20Webhooks-compliant-3068b7)](https://www.standardwebhooks.com)
 
-Outbound webhooks for Rails: signed, retried, subscription-based delivery.
+**Everything your hand-rolled webhook job is missing** — HMAC signing, retries
+with backoff, zero-downtime secret rotation, SSRF protection, and a queryable log
+of every delivery attempt.
 
-Angarium is a Rails engine that delivers outbound webhooks with HMAC
-request signing, automatic retries with exponential backoff, per-endpoint event
-subscriptions, and SSRF protection. It works with any ActiveJob backend and any
-Rails 7.1+ app. It's headless in v1 — no routes or UI, just models and jobs —
-but namespaced via `isolate_namespace`, so a UI can be mounted on top later.
+The moment "just POST from a background job" ships to production, the gaps start
+showing: your customers need signatures they can verify, failed deliveries need
+to back off and retry for hours, secrets need to rotate without downtime, an
+endpoint URL shouldn't be able to reach your internal network, and sooner or
+later someone asks "did we actually send it?". Angarium is a Rails engine that
+handles all of it — and it signs to the [Standard Webhooks](https://www.standardwebhooks.com)
+spec, so your receivers verify with off-the-shelf libraries in any language and
+you never write verification docs of your own. That conformance is enforced in
+CI: any drift from the spec fails the build.
+
+Headless by design — models and jobs, no UI forced on your app — and namespaced
+via `isolate_namespace`, so a dashboard can mount on top later. Works with any
+ActiveJob backend on Rails 7.1+.
+
+### 30-second tour
+
+Any model can own endpoints — an account, team, or user:
+
+```ruby
+class Account < ApplicationRecord
+  has_many :webhook_endpoints, as: :owner, class_name: "Angarium::Endpoint"
+end
+
+# Register an endpoint — its signing secret is generated for you
+account.webhook_endpoints.create!(
+  name: "Production",
+  url: "https://example.com/webhooks",
+  subscribed_events: ["invoice.*", "user.created"] # exact, "prefix.*", or "*"
+)
+
+# Fan an event out to every subscribed endpoint
+Angarium.dispatch("invoice.paid", { id: 123, total: 4200 }, owner: account)
+```
+
+Angarium handles the rest: signing, retries with backoff, `Retry-After`,
+dedup-friendly delivery IDs, SSRF checks, and a full attempt log. See
+[Delivery guarantees](#delivery-guarantees) for the specifics receivers care about.
 
 ## Installation
 
@@ -27,10 +61,11 @@ bin/rails angarium:install:migrations
 bin/rails g angarium:install
 ```
 
-### Required: Active Record Encryption
+### Active Record Encryption
 
-Angarium encrypts each endpoint's `signing_secret` and `custom_headers` at rest.
-Configure Active Record Encryption keys before using the gem:
+Angarium encrypts each endpoint's `signing_secret` and `custom_headers` at rest,
+so it needs Active Record Encryption keys — one command if you haven't set them
+up already:
 
 ```bash
 bin/rails db:encryption:init
@@ -44,34 +79,16 @@ See the [Rails guide on Active Record Encryption](https://guides.rubyonrails.org
 bin/rails db:migrate
 ```
 
-## Setup
-
-Associate webhook endpoints with any "owner" model (an account, team, or user):
-
-```ruby
-class Account < ApplicationRecord
-  has_many :webhook_endpoints, as: :owner, class_name: "Angarium::Endpoint"
-end
-```
-
-Create an endpoint (the `signing_secret` is generated automatically):
-
-```ruby
-account.webhook_endpoints.create!(
-  name: "Production",
-  url: "https://example.com/webhooks",
-  subscribed_events: ["invoice.*", "user.created"] # exact, "prefix.*", or "*"
-)
-```
-
 ## Dispatching events
+
+`Angarium.dispatch` fans a single event out to every enabled, subscribed
+endpoint — one delivery each, one ActiveJob per delivery:
 
 ```ruby
 Angarium.dispatch("invoice.paid", { id: 123, total: 4200 }, owner: account)
 ```
 
-This creates one delivery per enabled, subscribed endpoint and enqueues an
-ActiveJob per delivery. Each request is a JSON envelope:
+Each request is delivered as a JSON envelope:
 
 ```json
 { "id": 42, "event": "invoice.paid", "created_at": "2026-07-04T12:00:00Z", "data": { "id": 123, "total": 4200 } }
@@ -344,6 +361,38 @@ resolvable *only* via non-DNS mechanisms Angarium's resolver doesn't use
 webhook endpoints. HTTPX does not follow redirects, so redirect-based
 bypasses are already closed.
 
+## Delivery guarantees
+
+The specifics receivers use to decide whether to trust a webhook sender:
+
+- **Signed, timestamped, replay-resistant.** Every request carries
+  `webhook-id`, `webhook-timestamp`, and `webhook-signature` headers per the
+  [Standard Webhooks](https://www.standardwebhooks.com) spec — HMAC-SHA256 over
+  `{id}.{timestamp}.{body}`, with a 5-minute timestamp tolerance enforced on
+  verification. Verify with the official `standardwebhooks` library in any
+  language, or `Angarium::Signature.verify`.
+- **Stable IDs for deduplication.** `webhook-id` is the delivery's ID (the same
+  value as the envelope's `id`) and is identical across every retry of that
+  delivery — but unique per *delivery*, not per event. Delivery is
+  **at-least-once** — dedupe on that ID and treat repeats as no-ops.
+- **Retries with backoff, jitter, and `Retry-After`.** Failures (non-2xx,
+  timeouts, connection errors) retry on `config.retry_schedule` (default: the
+  Standard Webhooks schedule, twelve retries over ~10 days), with +0–15% jitter;
+  a receiver's `Retry-After` header is honored (capped by `config.max_retry_after`).
+- **Nothing is silently dropped.** When retries are exhausted the delivery is
+  persisted in an `exhausted` state (not deleted), and every attempt is recorded
+  as an `Angarium::DeliveryAttempt` (response code, body, error, duration).
+  Re-send any delivery manually with `delivery.redeliver!`.
+- **Zero-downtime secret rotation.** `endpoint.rotate_signing_secret!` keeps
+  the previous secret valid for `config.signing_secret_grace_period` (default
+  24h); requests during that window are signed under both secrets, so receivers
+  roll over without dropping a webhook.
+- **Auto-disable dead endpoints (opt-in).** Set
+  `config.auto_disable_endpoint_after` to deactivate an endpoint after N
+  consecutive failed deliveries; a success resets the counter.
+- **Secrets encrypted at rest** with Active Record Encryption (current and
+  in-rotation previous secret).
+
 ## Configuration
 
 Run `bin/rails g angarium:install` to generate `config/initializers/angarium.rb`
@@ -369,6 +418,41 @@ integer-keyed `User` and a UUID-keyed `Account` in the same app). This works
 transparently with any owner primary key — integer, UUID, or a mix — without
 any configuration.
 
+## Why not just POST from a job?
+
+`HTTP.post(endpoint.url, body: payload)` in a background job works — right up
+until it's in front of customers. Then the edge cases arrive one at a time, and
+each is a small project:
+
+- **Signatures.** Receivers won't (and shouldn't) trust an unsigned POST. Roll
+  your own and you now own an HMAC scheme, a header format, and the verification
+  docs your customers need in every language they use. Angarium signs to
+  [Standard Webhooks](https://www.standardwebhooks.com), so they verify with an
+  off-the-shelf library and you write none.
+- **Retries that don't stampede.** A receiver has a bad 30 minutes; a naive retry
+  either gives up too early or hammers them in lockstep. Angarium retries on a
+  backoff schedule (~10 days by default) with jitter, and honors `Retry-After`
+  — but only to *delay* a retry, never to pull it earlier than your schedule.
+- **Duplicate suppression.** Retries mean the same event lands more than once.
+  Without a stable ID that's invariant across a delivery's retries, receivers
+  can't dedupe. Angarium gives every delivery exactly that.
+- **SSRF.** An endpoint URL is user input. POST to it blindly and a customer can
+  point it at `169.254.169.254` or `10.0.0.1` and read your internal network.
+  Angarium blocks private ranges, pins the connection to the validated IP, and
+  fails closed on hosts it can't resolve.
+- **Secret rotation.** Rotating a signing secret through a single POST path means
+  a window where the old or new secret gets rejected. Angarium signs with both
+  during a grace window, so receivers roll over without dropping a webhook.
+- **Stranded deliveries.** A worker crashes mid-send and the delivery is stuck
+  half-done — no retry, no record. Angarium reaps deliveries stranded in
+  `delivering` and re-queues them.
+- **"Did we actually send it?"** When support asks, you need the answer. Angarium
+  persists every attempt — response code, body, error, duration — and never
+  silently drops a delivery.
+
+None of these is hard on its own. All of them, maintained, is a project. This is
+that project.
+
 ## How Angarium compares
 
 There are several ways to send outbound webhooks from a Rails app. Angarium aims
@@ -378,14 +462,14 @@ adopting external webhook infrastructure.
 | | Angarium | ActionHook | bullet_train-outgoing_webhooks | active_webhook | Svix / Hookdeck Outpost |
 |---|---|---|---|---|---|
 | Type | Rails engine (headless) | Ruby delivery library | Rails engine (Bullet Train) | Ruby library | Hosted / self-hosted service |
-| [Persisted endpoints & subscriptions](#setup) | ✅ per-endpoint event subscriptions | ❌ bring your own model | ✅ (tied to BT teams) | ✅ topics | ✅ |
+| [Persisted endpoints & subscriptions](#30-second-tour) | ✅ per-endpoint event subscriptions | ❌ bring your own model | ✅ (tied to BT teams) | ✅ topics | ✅ |
 | [HMAC request signing](#verifying-signatures-receiver-side) | ✅ | ✅ (SHA256 fingerprint) | ✅ | ✅ | ✅ |
 | [Standard Webhooks](https://www.standardwebhooks.com) compliant | ✅ | ❌ | ❌ | ❌ | ✅ (Svix initiated the spec) |
 | [Automatic retries with backoff](#retries) | ✅ jitter + `Retry-After` | ❌ (delegates to your job runner) | ✅ | ✅ (via queue adapter) | ✅ |
 | [Manual redelivery](#manual-redelivery) | ✅ | ❌ | ✅ `deliver(force:)` | ❌ | ✅ |
 | [Auto-disable failing endpoints](#auto-disabling-failing-endpoints) | ✅ (opt-in) | ❌ | ✅ (opt-in) | ❌ | ✅ |
 | [SSRF protection](#security-ssrf-protection) | ✅ block + pin + fail-closed | ✅ private-IP blocking | ❌ | ❌ | ✅ |
-| [Signing secrets encrypted at rest](#required-active-record-encryption) | ✅ Active Record Encryption | n/a (you store secrets) | ❌ | ❌ | ✅ |
+| [Signing secrets encrypted at rest](#active-record-encryption) | ✅ Active Record Encryption | n/a (you store secrets) | ❌ | ❌ | ✅ |
 | [Zero-downtime secret rotation](#rotating-a-signing-secret-zero-downtime) | ✅ dual-signing grace window | ❌ | ❌ | ❌ | ✅ |
 | Job backend | Any ActiveJob backend | n/a | ActiveJob | Multiple adapters | Own workers |
 | Runs inside your app | ✅ | ✅ | ✅ | ✅ | ❌ separate service |
@@ -419,38 +503,6 @@ via issue or PR.</sub>
 - **You're building on Bullet Train:** use
   [bullet_train-outgoing_webhooks](https://rubygems.org/gems/bullet_train-outgoing_webhooks),
   which integrates with its team and account model.
-
-### Delivery guarantees
-
-The specifics receivers use to decide whether to trust a webhook sender:
-
-- **Signed, timestamped, replay-resistant.** Every request carries
-  `webhook-id`, `webhook-timestamp`, and `webhook-signature` headers per the
-  [Standard Webhooks](https://www.standardwebhooks.com) spec — HMAC-SHA256 over
-  `{id}.{timestamp}.{body}`, with a 5-minute timestamp tolerance enforced on
-  verification. Verify with the official `standardwebhooks` library in any
-  language, or `Angarium::Signature.verify`.
-- **Stable IDs for deduplication.** `webhook-id` is the delivery's ID (the same
-  value as the envelope's `id`) and is identical across every retry of that
-  delivery — but unique per *delivery*, not per event. Delivery is
-  **at-least-once** — dedupe on that ID and treat repeats as no-ops.
-- **Retries with backoff, jitter, and `Retry-After`.** Failures (non-2xx,
-  timeouts, connection errors) retry on `config.retry_schedule` (default: the
-  Standard Webhooks schedule, twelve retries over ~10 days), with +0–15% jitter;
-  a receiver's `Retry-After` header is honored (capped by `config.max_retry_after`).
-- **Nothing is silently dropped.** When retries are exhausted the delivery is
-  persisted in an `exhausted` state (not deleted), and every attempt is recorded
-  as an `Angarium::DeliveryAttempt` (response code, body, error, duration).
-  Re-send any delivery manually with `delivery.redeliver!`.
-- **Zero-downtime secret rotation.** `endpoint.rotate_signing_secret!` keeps
-  the previous secret valid for `config.signing_secret_grace_period` (default
-  24h); requests during that window are signed under both secrets, so receivers
-  roll over without dropping a webhook.
-- **Auto-disable dead endpoints (opt-in).** Set
-  `config.auto_disable_endpoint_after` to deactivate an endpoint after N
-  consecutive failed deliveries; a success resets the counter.
-- **Secrets encrypted at rest** with Active Record Encryption (current and
-  in-rotation previous secret).
 
 ## License
 
