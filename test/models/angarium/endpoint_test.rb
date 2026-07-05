@@ -76,7 +76,7 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     # Even if the host would now resolve to a disallowed address, an unrelated
     # update (url/allowlist/allow_private unchanged) must not re-validate it.
     Angarium::AddressPolicy.stub(:resolve, [IPAddr.new("10.0.0.1")]) do
-      assert endpoint.update(active: false), endpoint.errors.full_messages.to_sentence
+      assert endpoint.update(status: :paused), endpoint.errors.full_messages.to_sentence
     end
   end
 
@@ -189,9 +189,38 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     Angarium.config.stub(:auto_disable_endpoint_after, 1) do
       endpoint.record_delivery_failure!
     end
-    refute endpoint.active?
-    assert endpoint.disabled_at.present?
+    assert endpoint.disabled?
+    assert endpoint.status_changed_at.present?
     assert_equal 1, endpoint.consecutive_failures
+  end
+
+  test "a new endpoint is enabled by default" do
+    assert build.tap(&:save!).enabled?
+  end
+
+  test "pause! stops deliveries and enable! resumes them" do
+    endpoint = build.tap(&:save!)
+
+    endpoint.pause!
+    assert endpoint.paused?
+    assert endpoint.status_changed_at.present?
+    assert_empty Angarium::Endpoint.enabled
+
+    endpoint.enable!
+    assert endpoint.enabled?
+    assert_equal [endpoint], Angarium::Endpoint.enabled.to_a
+  end
+
+  test "enable! revives a disabled endpoint and clears the failure counter" do
+    endpoint = build.tap(&:save!)
+    Angarium.config.stub(:auto_disable_endpoint_after, 1) do
+      endpoint.record_delivery_failure!
+    end
+    assert endpoint.disabled?
+
+    endpoint.enable!
+    assert endpoint.enabled?
+    assert_equal 0, endpoint.consecutive_failures
   end
 
   test "record_delivery_success! clears consecutive_failures" do

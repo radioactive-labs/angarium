@@ -3,7 +3,7 @@ module Angarium
     module_function
 
     def call(event_name, payload, owner:)
-      endpoints = Endpoint.active.where(owner: owner).select do |endpoint|
+      endpoints = Endpoint.enabled.where(owner: owner).select do |endpoint|
         endpoint.subscribed_to?(event_name)
       end
       return nil if endpoints.empty?

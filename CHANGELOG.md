@@ -36,8 +36,12 @@
   default 64 KiB; `nil` stores the full body).
 - Manual redelivery: `Delivery#redeliver!` resets the retry cycle and re-enqueues,
   keeping prior attempt history.
+- Endpoint lifecycle `status` enum (`enabled`/`paused`/`disabled`/`gone`,
+  replacing the old boolean `active`), with `pause!`/`enable!` transitions,
+  `status_changed_at`, and an `Endpoint.enabled` scope. Only `enabled` endpoints
+  receive deliveries.
 - Endpoint auto-disable after `config.auto_disable_endpoint_after` consecutive
-  failed deliveries (`consecutive_failures`/`disabled_at`), resetting on success.
+  failed deliveries (moves status to `disabled`), resetting the counter on success.
 - Standard Webhooks status-code handling: `410 Gone` disables the endpoint
   immediately and marks the delivery `gone` (new terminal state, no retries);
   `429`/`502`/`504` and other non-2xx responses stay retryable with backoff and

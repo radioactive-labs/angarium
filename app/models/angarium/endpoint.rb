@@ -16,24 +16,26 @@ module Angarium
 
     encrypts :signing_secret, :previous_signing_secret
 
-    # Rails < 8.1's SQLite adapter doesn't parse the `DEFAULT TRUE`/`DEFAULT
-    # FALSE` literals SQLite reports back for boolean columns (fixed in
-    # ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements
-    # #extract_value_from_default starting in Rails 8.1), leaving these
-    # attributes nil on a new record instead of the schema default.
-    # Declaring the defaults here keeps behavior correct on every supported
-    # Rails version.
-    attribute :active, :boolean, default: true
-    attribute :allow_private_network, :boolean, default: false
+    # Lifecycle status. `enabled` endpoints receive deliveries; the rest don't.
+    #   paused   — turned off manually (resumable via #enable!)
+    #   disabled — auto-disabled after too many consecutive failures (resumable)
+    #   gone      — the receiver returned HTTP 410; treat as terminal
+    enum :status, { enabled: "enabled", paused: "paused", disabled: "disabled", gone: "gone" },
+      default: :enabled
 
-    scope :active, -> { where(active: true) }
+    # Rails < 8.1's SQLite adapter doesn't parse the `DEFAULT FALSE` literal
+    # SQLite reports back for boolean columns (fixed in
+    # ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements
+    # #extract_value_from_default starting in Rails 8.1), leaving this attribute
+    # nil on a new record instead of the schema default. Declaring the default
+    # here keeps behavior correct on every supported Rails version.
+    attribute :allow_private_network, :boolean, default: false
 
     before_validation :ensure_signing_secret, on: :create
 
     validates :name, presence: true
     validates :url, presence: true
     validates :url, "angarium/endpoint_url": true, if: :verify_url_address?
-    validates :active, inclusion: { in: [true, false] }
     validate :allowed_networks_are_valid_cidrs
     validate :custom_headers_are_strings
 
@@ -81,14 +83,27 @@ module Angarium
       disable!(reason: :consecutive_failures) if threshold && consecutive_failures >= threshold
     end
 
-    # Deactivate the endpoint (no further deliveries) and fire the
-    # on_endpoint_disabled callback once. `reason` is :consecutive_failures
-    # (auto-disable threshold) or :gone (receiver returned HTTP 410).
+    # Move to a non-delivering state (no further deliveries) and fire the
+    # on_endpoint_disabled callback once. `reason` maps to the target status:
+    #   :consecutive_failures -> disabled (auto-disable threshold)
+    #   :gone                 -> gone     (receiver returned HTTP 410)
     def disable!(reason:)
-      return unless active?
+      target = reason == :gone ? :gone : :disabled
+      return if status.to_sym == target
 
-      update!(active: false, disabled_at: Time.current)
+      update!(status: target, status_changed_at: Time.current)
       Angarium.notify(:on_endpoint_disabled, self, reason)
+    end
+
+    # Pause deliveries manually. Resumable via #enable!.
+    def pause!
+      update!(status: :paused, status_changed_at: Time.current)
+    end
+
+    # (Re-)enable deliveries and clear the failure counter. Works from any state,
+    # including `gone` (an explicit operator override of a receiver's 410).
+    def enable!
+      update!(status: :enabled, status_changed_at: Time.current, consecutive_failures: 0)
     end
 
     # Deliver a synthetic `angarium.ping` event to this endpoint, bypassing

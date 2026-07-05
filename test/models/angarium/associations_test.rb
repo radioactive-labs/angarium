@@ -23,9 +23,9 @@ class Angarium::AssociationsTest < ActiveSupport::TestCase
     assert_equal [@delivery], @event.deliveries.to_a
   end
 
-  test "active scope filters inactive endpoints" do
-    @endpoint.update!(active: false)
-    assert_empty Angarium::Endpoint.active
+  test "enabled scope filters out non-enabled endpoints" do
+    @endpoint.update!(status: :disabled)
+    assert_empty Angarium::Endpoint.enabled
   end
 
   test "supports a string/uuid-keyed owner alongside an integer-keyed owner" do

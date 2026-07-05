@@ -5,7 +5,7 @@ class Angarium::DispatchTest < ActiveSupport::TestCase
     @owner = Owner.create!(name: "Acme")
     @subscribed = endpoint(subscribed_events: ["invoice.*"])
     @other = endpoint(subscribed_events: ["user.created"])
-    @inactive = endpoint(subscribed_events: ["*"], active: false)
+    @inactive = endpoint(subscribed_events: ["*"], status: :disabled)
   end
 
   def endpoint(attrs)

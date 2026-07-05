@@ -36,18 +36,18 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_04_000101) do
   end
 
   create_table "angarium_endpoints", force: :cascade do |t|
-    t.boolean "active", default: true, null: false
     t.boolean "allow_private_network", default: false, null: false
     t.json "allowed_networks", default: [], null: false
     t.integer "consecutive_failures", default: 0, null: false
     t.datetime "created_at", null: false
     t.json "custom_headers", default: {}, null: false
-    t.datetime "disabled_at"
     t.string "name", null: false
     t.string "owner_id", null: false
     t.string "owner_type", null: false
     t.text "previous_signing_secret"
     t.datetime "secret_rotated_at"
+    t.string "status", default: "enabled", null: false
+    t.datetime "status_changed_at"
     t.text "signing_secret", null: false
     t.json "subscribed_events", default: [], null: false
     t.datetime "updated_at", null: false

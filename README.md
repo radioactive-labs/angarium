@@ -70,7 +70,7 @@ account.webhook_endpoints.create!(
 Angarium.dispatch("invoice.paid", { id: 123, total: 4200 }, owner: account)
 ```
 
-This creates one delivery per active, subscribed endpoint and enqueues an
+This creates one delivery per enabled, subscribed endpoint and enqueues an
 ActiveJob per delivery. Each request is a JSON envelope:
 
 ```json
@@ -172,7 +172,7 @@ Angarium follows the Standard Webhooks receiver-etiquette guidance:
 | Response | Handling |
 | --- | --- |
 | `2xx` | Success. |
-| `410 Gone` | The receiver wants no more webhooks. The **endpoint is disabled** (`active` → `false`) and the delivery is marked `gone` — no retries. |
+| `410 Gone` | The receiver wants no more webhooks. The **endpoint status becomes `gone`** and the delivery is marked `gone` — no retries. |
 | `429`, `502`, `504` | Retryable failure — retried with backoff, honoring `Retry-After` when present (the recommended way to throttle). |
 | `3xx` and everything else | Retryable failure. Redirects are **not** followed (following them loads both sides); update the endpoint URL instead. |
 
@@ -204,14 +204,29 @@ delivery.redeliver!
 This resets the retry cycle (`state` → `pending`, `attempt_count` → 0) and
 enqueues a fresh `DeliverJob`, while keeping the prior `DeliveryAttempt` history.
 
+### Endpoint status
+
+Every endpoint has a lifecycle `status` (only `enabled` endpoints receive
+deliveries):
+
+| Status | Meaning | Resumable? |
+| --- | --- | --- |
+| `enabled` | Delivering normally. | — |
+| `paused` | Turned off manually (`endpoint.pause!`). | `endpoint.enable!` |
+| `disabled` | Auto-disabled after too many consecutive failures. | `endpoint.enable!` |
+| `gone` | The receiver returned `410 Gone`. Treat as terminal. | `endpoint.enable!` (explicit override) |
+
+Every transition stamps `status_changed_at`. `endpoint.enable!` also clears the
+failure counter. Scope enabled endpoints with `Angarium::Endpoint.enabled`.
+
 ### Auto-disabling failing endpoints
 
 Set `config.auto_disable_endpoint_after` to a number of **consecutive** failed
-deliveries after which an endpoint is automatically disabled (`active` → `false`,
-`disabled_at` timestamped). `endpoint.consecutive_failures` tracks the running
-count and resets to `0` on the next successful delivery. Left `nil` (the
-default), endpoints are never auto-disabled. (A `410 Gone` response disables the
-endpoint immediately, regardless of this setting.)
+deliveries after which an endpoint is automatically moved to `disabled`.
+`endpoint.consecutive_failures` tracks the running count and resets to `0` on the
+next successful delivery. Left `nil` (the default), endpoints are never
+auto-disabled. (A `410 Gone` response moves the endpoint to `gone` immediately,
+regardless of this setting.)
 
 ### Notification callbacks
 

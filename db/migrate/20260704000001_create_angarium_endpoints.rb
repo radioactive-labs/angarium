@@ -4,7 +4,7 @@ class CreateAngariumEndpoints < ActiveRecord::Migration[7.1]
       t.references :owner, polymorphic: true, null: false, type: :string
       t.string :name, null: false
       t.string :url, null: false
-      t.boolean :active, null: false, default: true
+      t.string :status, null: false, default: "enabled"
       t.text :signing_secret, null: false
       t.json :subscribed_events, null: false, default: []
       t.boolean :allow_private_network, null: false, default: false
@@ -13,7 +13,7 @@ class CreateAngariumEndpoints < ActiveRecord::Migration[7.1]
       t.integer :consecutive_failures, null: false, default: 0
       t.text :previous_signing_secret
       t.datetime :secret_rotated_at
-      t.datetime :disabled_at
+      t.datetime :status_changed_at
       t.timestamps
     end
   end

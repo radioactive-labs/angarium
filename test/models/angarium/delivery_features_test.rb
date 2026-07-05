@@ -144,13 +144,13 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
         create_delivery.deliver!(client: failing_client)
         @endpoint.reload
         assert_equal 1, @endpoint.consecutive_failures
-        assert @endpoint.active?, "endpoint should still be active after one failure"
+        assert @endpoint.enabled?, "endpoint should still be enabled after one failure"
 
         create_delivery.deliver!(client: failing_client)
         @endpoint.reload
         assert_equal 2, @endpoint.consecutive_failures
-        refute @endpoint.active?, "endpoint should be disabled after threshold failures"
-        assert @endpoint.disabled_at.present?
+        assert @endpoint.disabled?, "endpoint should be disabled after threshold failures"
+        assert @endpoint.status_changed_at.present?
 
         create_delivery.deliver!(client: succeeding_client)
         @endpoint.reload
@@ -236,8 +236,8 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     assert_nil delivery.next_attempt_at
 
     @endpoint.reload
-    refute @endpoint.active?, "410 should disable the endpoint"
-    assert @endpoint.disabled_at.present?
+    assert @endpoint.gone?, "410 should mark the endpoint gone"
+    assert @endpoint.status_changed_at.present?
   end
 
   test "410 Gone fires on_endpoint_disabled with reason :gone" do
