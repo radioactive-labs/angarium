@@ -282,4 +282,12 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     endpoint.verify!
     assert endpoint.reload.disabled?
   end
+
+  test "a status transition to the current status is a no-op (no redundant write)" do
+    endpoint = build.tap(&:save!)
+    assert endpoint.pause!, "enabled -> paused should transition"
+    stamped = endpoint.reload.status_changed_at
+    refute endpoint.pause!, "already paused: no transition, returns false"
+    assert_equal stamped, endpoint.reload.status_changed_at, "status_changed_at must not be re-stamped on a no-op"
+  end
 end

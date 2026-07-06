@@ -101,56 +101,38 @@ module Angarium
 
     # Move to a non-delivering state (no further deliveries) and fire the
     # on_endpoint_deactivated callback once. `reason` maps to the target status:
-    #   :consecutive_failures -> disabled (auto-disable threshold)
-    #   :gone                 -> gone     (receiver returned HTTP 410)
+    #   :consecutive_failures -> disabled (auto-disable, only from `enabled`)
+    #   :gone                 -> gone     (receiver returned HTTP 410; overrides
+    #                                       any non-gone status, so a racing
+    #                                       auto-disable can't clobber a 410)
     def deactivate!(reason:)
-      target = (reason == :gone) ? :gone : :disabled
-      return if status.to_sym == target
-
-      # Atomic, fire-once transition: only the call that actually flips the status
-      # (exactly one row updated) runs the callback, so concurrent threshold
-      # crossings can't double-fire it. Auto-disable only transitions an `enabled`
-      # endpoint, while `gone` (a terminal 410) can override any non-gone status,
-      # so a 410 is never clobbered by a racing auto-disable.
-      scope = self.class.where(id: id)
-      scope = (target == :gone) ? scope.where.not(status: "gone") : scope.where(status: "enabled")
-      changed = scope.update_all(status: target.to_s, status_changed_at: Time.current, updated_at: Time.current)
-      return if changed.zero?
-
-      reload
-      Angarium.notify(:on_endpoint_deactivated, self, reason)
+      target, from = (reason == :gone) ? [:gone, nil] : [:disabled, :enabled]
+      transition_status!(target, from: from) { Angarium.notify(:on_endpoint_deactivated, self, reason) }
     end
 
     # Pause deliveries manually. Resumable via #enable!.
     def pause!
-      update!(status: :paused, status_changed_at: Time.current)
+      transition_status!(:paused)
     end
 
     # (Re-)enable deliveries and clear the failure counter. Works from any state,
     # including `gone` (an explicit operator override of a receiver's 410).
     def enable!
-      update!(status: :enabled, status_changed_at: Time.current, consecutive_failures: 0)
+      return false unless transition_status!(:enabled, consecutive_failures: 0)
       # Resume deliveries parked while this endpoint was paused (pending with no
       # scheduled attempt). Dispatch creates none while paused, so this only
       # re-enqueues the held ones.
       deliveries.where(state: "pending", next_attempt_at: nil).find_each { |d| DeliverJob.perform_later(d.id) }
+      true
     end
 
     # Promote an `unverified` endpoint to `enabled` once it has proven it can
     # receive webhooks. A no-op on any other status: a `disabled`/`gone` endpoint
     # is revived with #enable!, not verified. Called automatically when a delivery
-    # to an unverified endpoint succeeds (a forced #ping!), or manually. The
-    # atomic conditional update fires on_endpoint_verified exactly once even if
-    # two deliveries verify concurrently.
+    # to an unverified endpoint succeeds (a forced #ping!), or manually. Fires
+    # on_endpoint_verified exactly once, even under concurrent verification.
     def verify!
-      return unless unverified?
-
-      changed = self.class.where(id: id, status: "unverified")
-        .update_all(status: "enabled", status_changed_at: Time.current, updated_at: Time.current)
-      return if changed.zero?
-
-      reload
-      Angarium.notify(:on_endpoint_verified, self)
+      transition_status!(:enabled, from: :unverified) { Angarium.notify(:on_endpoint_verified, self) }
     end
 
     # Deliver a synthetic `angarium.ping` event to this endpoint, bypassing
@@ -165,6 +147,27 @@ module Angarium
     end
 
     private
+
+    # Atomically move to `target` status, stamping status_changed_at (and any
+    # `extra` columns) only on a real change, so a no-op transition writes nothing.
+    # With `from:` the change applies only from those source statuses; otherwise
+    # from any status but the target. Returns true iff this call made the change,
+    # so a caller's block runs exactly once even under concurrent transitions (no
+    # double callback). All status transitions go through here to stay consistent.
+    def transition_status!(target, from: nil, **extra)
+      target = target.to_s
+      from &&= Array(from).map(&:to_s)
+      return false if from ? from.exclude?(status) : status == target
+
+      scope = self.class.where(id: id)
+      scope = from ? scope.where(status: from) : scope.where.not(status: target)
+      changed = scope.update_all({status: target, status_changed_at: Time.current, updated_at: Time.current}.merge(extra))
+      return false if changed.zero?
+
+      reload
+      yield if block_given?
+      true
+    end
 
     def ensure_signing_secret
       self.signing_secret ||= self.class.generate_signing_secret
