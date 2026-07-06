@@ -1,4 +1,6 @@
 /test/dummy/db/*.sqlite3
+/test/dummy/db/*.sqlite3-shm
+/test/dummy/db/*.sqlite3-wal
 /test/dummy/log/*
 !/test/dummy/log/.keep
 /test/tmp/

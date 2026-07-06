@@ -15,6 +15,7 @@ gem "standardwebhooks"
 gem "chaotic_job"
 
 gem "puma"
+gem "solid_queue"
 
 gem "sprockets-rails"
 
