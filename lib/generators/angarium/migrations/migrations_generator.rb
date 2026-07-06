@@ -3,12 +3,14 @@ require "rails/generators/base"
 module Angarium
   module Generators
     # Installs (and, after a gem upgrade, refreshes) Angarium's engine migrations.
-    # This is Angarium's single migration path (the engine unregisters db/migrate
-    # so Rails' generic install:migrations task is not generated). It is
-    # multi-database aware: it reads config.database (set at install time) so a
-    # host that forgets the flag on a later run still gets new migrations in the
-    # right place. Uses Rails' native ActiveRecord::Migration.copy, so re-runs are
-    # idempotent (already-installed migrations are skipped).
+    # Angarium keeps its migrations in db/angarium_migrate rather than the
+    # conventional db/migrate, so Rails never auto-appends them onto the host's
+    # primary connection nor generates a generic install:migrations task: this
+    # generator is the single install path. It is multi-database aware: it reads
+    # config.database (set at install time) so a host that forgets the flag on a
+    # later run still gets new migrations in the right place. Uses Rails' native
+    # ActiveRecord::Migration.copy, so re-runs are idempotent (already-installed
+    # migrations are skipped).
     class MigrationsGenerator < Rails::Generators::Base
       desc "Installs Angarium's migrations. Multi-db setups (config.database or " \
            "--database) get them in db/NAME_migrate; otherwise the primary db/migrate."
@@ -24,7 +26,7 @@ module Angarium
         dir = (database.nil? || database.to_s == "primary") ? "db/migrate" : "db/#{database}_migrate"
         copied = ActiveRecord::Migration.copy(
           File.join(destination_root, dir),
-          {"angarium" => Angarium::Engine.root.join("db/migrate").to_s}
+          {"angarium" => Angarium::Engine.root.join("db/angarium_migrate").to_s}
         )
         if copied.any?
           say_status :installed, "#{copied.size} Angarium migration(s) into #{dir}", :green
