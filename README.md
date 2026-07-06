@@ -636,6 +636,39 @@ rely on:
 Secret rotation, SSRF protection, and encryption harden delivery but aren't
 delivery-semantics guarantees; they have their own sections above.
 
+## Instrumentation
+
+Angarium emits `ActiveSupport::Notifications` events so you can feed delivery
+metrics and traces into your own backend (StatsD, Prometheus, OpenTelemetry, or
+structured logs). This is the metrics leg beside the notification callbacks
+(alerting) and the `DeliveryAttempt` rows (audit); it is off unless you subscribe.
+
+**`deliver.angarium`** fires once per delivery attempt:
+
+| Key | Notes |
+| --- | --- |
+| `delivery_id`, `endpoint_id` | ids |
+| `event` | the event name being delivered |
+| `outcome` | `delivered` \| `failed` \| `gone` \| `held` \| `canceled` \| `blocked` \| `unresolvable` |
+| `attempt` | attempt number (absent for `held`/`canceled`) |
+| `code` | HTTP status, when a response was received |
+| `http_duration` | wire time in seconds, when a request went out |
+| `error` | failure reason string, on `blocked`/`unresolvable` and a transport-error `failed` (a non-2xx `failed` carries its status in `code` instead) |
+| `force` | whether the status guard was bypassed |
+
+**`dispatch.angarium`** fires once per `Angarium.dispatch`: `event`, `event_id`,
+and `deliveries` (fan-out count).
+
+Payloads carry ids, codes, and timings only, never the signing secret or the
+request/response body, so they are safe to ship to third-party backends.
+
+```ruby
+ActiveSupport::Notifications.subscribe("deliver.angarium") do |*, payload|
+  StatsD.increment("webhooks.delivery.#{payload[:outcome]}")
+  StatsD.histogram("webhooks.delivery.ms", payload[:http_duration] * 1000) if payload[:http_duration]
+end
+```
+
 ## Configuration
 
 Run `bin/rails g angarium:install` to generate `config/initializers/angarium.rb`,

@@ -1,0 +1,25 @@
+{
+  "planPath": "docs/superpowers/plans/2026-07-06-instrumentation.md",
+  "tasks": [
+    {
+      "id": 19,
+      "subject": "Task 1: Instrument deliver.angarium",
+      "status": "completed",
+      "description": "**Goal:** Delivery#deliver! emits one deliver.angarium event per call with outcome + per-attempt fields, for all 7 outcomes.\n\n**Files:** app/models/angarium/delivery.rb; test/models/angarium/delivery_instrumentation_test.rb (create)\n\n**Verify:** bin/rails test test/models/angarium/delivery_instrumentation_test.rb\n\n```json:metadata\n{\"files\": [\"app/models/angarium/delivery.rb\", \"test/models/angarium/delivery_instrumentation_test.rb\"], \"verifyCommand\": \"bin/rails test test/models/angarium/delivery_instrumentation_test.rb\", \"acceptanceCriteria\": [\"deliver.angarium fires once per call\", \"outcome matches branch for all 7 outcomes\", \"code/http_duration only when HTTP; attempt absent for held/canceled\", \"no secret or response body in payload\", \"return values unchanged\"], \"requiresUserVerification\": false}\n```"
+    },
+    {
+      "id": 20,
+      "subject": "Task 2: Instrument dispatch.angarium",
+      "status": "completed",
+      "description": "**Goal:** Angarium::Dispatch.call emits one dispatch.angarium event with event name, created event_id, and fan-out count (including 0 on no match).\n\n**Files:** lib/angarium/dispatch.rb; test/lib/angarium/dispatch_instrumentation_test.rb (create)\n\n**Verify:** bin/rails test test/lib/angarium/dispatch_instrumentation_test.rb\n\n```json:metadata\n{\"files\": [\"lib/angarium/dispatch.rb\", \"test/lib/angarium/dispatch_instrumentation_test.rb\"], \"verifyCommand\": \"bin/rails test test/lib/angarium/dispatch_instrumentation_test.rb\", \"acceptanceCriteria\": [\"dispatch.angarium fires once per call\", \"deliveries equals fan-out size\", \"no-match yields deliveries=0 event_id=nil and returns nil\"], \"requiresUserVerification\": false}\n```"
+    },
+    {
+      "id": 21,
+      "subject": "Task 3: Document instrumentation in README",
+      "status": "completed",
+      "blockedBy": [19, 20],
+      "description": "**Goal:** Add a ## Instrumentation section listing both events, their payloads, and a subscribe example.\n\n**Files:** README.md (after ## Delivery guarantees)\n\n**Verify:** grep for tells (none) and deliver.angarium (present)\n\n```json:metadata\n{\"files\": [\"README.md\"], \"verifyCommand\": \"grep -n deliver.angarium README.md\", \"acceptanceCriteria\": [\"both events + payload keys documented\", \"runnable subscribe example present\", \"no em-dash/en-dash/ellipsis\"], \"requiresUserVerification\": false}\n```"
+    }
+  ],
+  "lastUpdated": "2026-07-06T00:00:00Z"
+}
