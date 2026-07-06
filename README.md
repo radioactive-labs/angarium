@@ -253,6 +253,14 @@ deliveries):
 Every transition stamps `status_changed_at`. `endpoint.enable!` also clears the
 failure counter. Scope enabled endpoints with `Angarium::Endpoint.enabled`.
 
+The `enabled` filter also applies to deliveries **already queued** when the status
+changes (a retry cycle that trips auto-disable, a manual `pause!`, or a sibling
+delivery's `410`). Each delivery re-checks the endpoint before it attempts:
+`paused` **holds** the delivery (it stays `pending`, consumes no attempt, and
+`enable!` re-enqueues it), while `disabled`/`gone` **cancels** it (a terminal
+`canceled` state, logged with the reason). Recover a canceled delivery after
+re-enabling with `delivery.redeliver!`.
+
 ### Auto-disabling failing endpoints
 
 Set `config.auto_disable_endpoint_after` to a number of **consecutive** failed

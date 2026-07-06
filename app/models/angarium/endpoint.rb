@@ -128,6 +128,10 @@ module Angarium
     # including `gone` (an explicit operator override of a receiver's 410).
     def enable!
       update!(status: :enabled, status_changed_at: Time.current, consecutive_failures: 0)
+      # Resume deliveries parked while this endpoint was paused (pending with no
+      # scheduled attempt). Dispatch creates none while paused, so this only
+      # re-enqueues the held ones.
+      deliveries.where(state: "pending", next_attempt_at: nil).find_each { |d| DeliverJob.perform_later(d.id) }
     end
 
     # Deliver a synthetic `angarium.ping` event to this endpoint, bypassing

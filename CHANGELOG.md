@@ -58,7 +58,9 @@ compatible.
 - Endpoint lifecycle `status` enum (`enabled`/`paused`/`disabled`/`gone`,
   replacing the old boolean `active`), with `pause!`/`enable!` transitions,
   `status_changed_at`, and an `Endpoint.enabled` scope. Only `enabled` endpoints
-  receive deliveries.
+  receive deliveries; a delivery already queued when its endpoint leaves `enabled`
+  is re-checked at attempt time and held (`paused`, re-enqueued by `enable!`) or
+  moved to a terminal `canceled` state (`disabled`/`gone`) instead of delivered.
 - Endpoint auto-disable after `config.auto_disable_endpoint_after` consecutive
   failed deliveries (moves status to `disabled`), resetting the counter on success.
 - Standard Webhooks status-code handling: `410 Gone` disables the endpoint

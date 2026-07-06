@@ -154,10 +154,57 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
         assert @endpoint.disabled?, "endpoint should be disabled after threshold failures"
         assert @endpoint.status_changed_at.present?
 
-        create_delivery.deliver!(client: succeeding_client)
-        @endpoint.reload
-        assert_equal 0, @endpoint.consecutive_failures
+        # Now disabled: a further queued delivery is canceled, not delivered, and
+        # the counter is untouched (nothing was attempted).
+        canceled = create_delivery
+        canceled.deliver!(client: succeeding_client)
+        assert canceled.reload.canceled?
+        assert_equal 2, @endpoint.reload.consecutive_failures
+
+        # Re-enabling clears the counter and resumes delivery.
+        @endpoint.enable!
+        assert_equal 0, @endpoint.reload.consecutive_failures
       end
+    end
+  end
+
+  test "a queued delivery to a disabled endpoint is canceled, not delivered" do
+    @endpoint.update!(status: :disabled)
+    fake = succeeding_client
+    delivery = create_delivery
+    delivery.deliver!(client: fake)
+
+    assert delivery.reload.canceled?
+    refute fake.requested?, "must not send to a disabled endpoint"
+    assert_match(/canceled: endpoint disabled/, delivery.delivery_attempts.last.error)
+    assert_nil delivery.delivery_attempts.last.response_code
+  end
+
+  test "a queued delivery to a gone endpoint is canceled" do
+    @endpoint.update!(status: :gone)
+    fake = succeeding_client
+    delivery = create_delivery
+    delivery.deliver!(client: fake)
+
+    assert delivery.reload.canceled?
+    refute fake.requested?
+    assert_match(/canceled: endpoint gone/, delivery.delivery_attempts.last.error)
+  end
+
+  test "a queued delivery to a paused endpoint is held, then resumes on enable!" do
+    delivery = create_delivery
+    @endpoint.pause!
+    fake = succeeding_client
+    assert_nil delivery.deliver!(client: fake), "a held delivery makes no attempt"
+
+    delivery.reload
+    assert delivery.pending?, "held delivery stays pending"
+    assert_nil delivery.next_attempt_at
+    assert_equal 0, delivery.delivery_attempts.count, "nothing logged while held"
+    refute fake.requested?
+
+    assert_enqueued_with(job: Angarium::DeliverJob, args: [delivery.id]) do
+      @endpoint.enable!
     end
   end
 

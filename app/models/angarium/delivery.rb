@@ -2,10 +2,11 @@ require "uri"
 
 module Angarium
   class Delivery < ApplicationRecord
-    # Delivery lifecycle. Terminal: succeeded, exhausted, blocked (SSRF), gone (410).
+    # Delivery lifecycle. Terminal: succeeded, exhausted, blocked (SSRF),
+    # gone (410), canceled (endpoint no longer accepting deliveries at attempt time).
     enum :state, {
       pending: "pending", delivering: "delivering", succeeded: "succeeded",
-      exhausted: "exhausted", blocked: "blocked", gone: "gone"
+      exhausted: "exhausted", blocked: "blocked", gone: "gone", canceled: "canceled"
     }, default: :pending
 
     belongs_to :event, class_name: "Angarium::Event"
@@ -36,6 +37,13 @@ module Angarium
     # Performs one attempt. Records a DeliveryAttempt, then transitions to
     # succeeded, blocked (SSRF), schedules a retry, or exhausts. Returns the attempt.
     def deliver!(client: Client.new)
+      # An endpoint's status can change after a delivery is queued: auto-disable
+      # partway through a retry cycle, an operator pause!, or a 410 from a sibling
+      # delivery. The dispatch-time `enabled` filter only gates delivery creation,
+      # not queued retries, so re-check here before attempting.
+      return hold_for_pause! if endpoint.paused?
+      return cancel!(reason: endpoint.status) unless endpoint.enabled?
+
       update!(state: "delivering", attempt_count: attempt_count + 1, last_attempt_at: Time.current)
 
       # Re-resolve at delivery time (rather than trusting the save-time check)
@@ -113,6 +121,24 @@ module Angarium
     end
 
     private
+
+    # Endpoint was paused after this delivery was queued. Park it (no attempt
+    # consumed, no failure recorded) by clearing the schedule and leaving it
+    # pending; Endpoint#enable! re-enqueues parked deliveries so a pause/resume
+    # cycle doesn't lose them. Returns nil (no attempt was made).
+    def hold_for_pause!
+      update!(state: "pending", next_attempt_at: nil)
+      nil
+    end
+
+    # Endpoint reached a terminal state (disabled or gone) after this delivery was
+    # queued. Stop retrying and log why. Recover with redeliver! if the endpoint is
+    # later re-enabled. Returns the logged attempt.
+    def cancel!(reason:)
+      attempt = delivery_attempts.create!(error: "canceled: endpoint #{reason}")
+      update!(state: "canceled", next_attempt_at: nil)
+      attempt
+    end
 
     def succeed!
       update!(state: "succeeded", next_attempt_at: nil)
