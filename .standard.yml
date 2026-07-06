@@ -1,0 +1,9 @@
+# For available configuration options, see:
+#   https://github.com/standardrb/standard
+ruby_version: 3.2
+
+ignore:
+  # test/dummy is a generated Rails app; don't impose our style on scaffolding.
+  - "test/dummy/**/*"
+  # Generator templates are ERB, not parseable as Ruby.
+  - "lib/generators/**/templates/**/*"
