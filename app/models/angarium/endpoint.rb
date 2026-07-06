@@ -157,10 +157,14 @@ module Angarium
     def transition_status!(target, from: nil, **extra)
       target = target.to_s
       from &&= Array(from).map(&:to_s)
-      return false if from ? from.exclude?(status) : status == target
+      # Two independent guards, both always applied: skip if we're already at the
+      # target (no redundant write / no spurious callback), and skip if we're not
+      # in a permitted source status. The atomic update enforces both at the DB
+      # level, so a concurrent transition can't slip past either.
+      return false if status == target || from&.exclude?(status)
 
-      scope = self.class.where(id: id)
-      scope = from ? scope.where(status: from) : scope.where.not(status: target)
+      scope = self.class.where(id: id).where.not(status: target)
+      scope = scope.where(status: from) if from
       changed = scope.update_all({status: target, status_changed_at: Time.current, updated_at: Time.current}.merge(extra))
       return false if changed.zero?
 
