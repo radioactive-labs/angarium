@@ -24,6 +24,12 @@ class Angarium::MigrationsGeneratorTest < Rails::Generators::TestCase
     assert_empty Dir[File.join(destination_root, "db/migrate/*.rb")]
   end
 
+  test "treats --database=primary as the primary db/migrate" do
+    run_generator ["--database=primary"]
+    assert endpoints_migration("db/migrate"), "primary is not db/primary_migrate"
+    assert_empty Dir[File.join(destination_root, "db/primary_migrate/*.rb")]
+  end
+
   test "falls back to config.database when no flag is given" do
     Angarium.config.database = :billing
     run_generator

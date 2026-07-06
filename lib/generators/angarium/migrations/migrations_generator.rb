@@ -18,7 +18,9 @@ module Angarium
 
       def install_migrations
         database = options[:database].presence || Angarium.config.migrations_database
-        dir = database ? "db/#{database}_migrate" : "db/migrate"
+        # The primary connection always migrates from db/migrate; only a separate
+        # database gets its own db/<name>_migrate path.
+        dir = (database.nil? || database.to_s == "primary") ? "db/migrate" : "db/#{database}_migrate"
         copied = ActiveRecord::Migration.copy(
           File.join(destination_root, dir),
           {"angarium" => Angarium::Engine.root.join("db/migrate").to_s}
