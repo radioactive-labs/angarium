@@ -12,19 +12,18 @@ class Angarium::InstallGeneratorTest < Rails::Generators::TestCase
     assert_file "config/initializers/angarium.rb", /Angarium.configure/
   end
 
-  test "without --database leaves connects_to commented and installs no migrations" do
+  test "without --database leaves config.database commented and installs no migrations" do
     run_generator
-    assert_file "config/initializers/angarium.rb", /^\s*#\s*config\.connects_to\s*=/
+    assert_file "config/initializers/angarium.rb", /^\s*#\s*config\.database\s*=/
     assert_empty Dir[File.join(destination_root, "db/angarium_migrate/*.rb")]
   end
 
-  test "with --database enables connects_to and installs migrations into db/NAME_migrate" do
+  test "with --database sets config.database and installs migrations into db/NAME_migrate" do
     run_generator ["--database=angarium"]
-    assert_file "config/initializers/angarium.rb",
-      /^\s*config\.connects_to = \{ database: \{ writing: :angarium, reading: :angarium \} \}/
+    assert_file "config/initializers/angarium.rb", /^\s*config\.database = :angarium/
 
     migrations = Dir[File.join(destination_root, "db/angarium_migrate/*.rb")].sort
-    assert_equal 4, migrations.size, "installs all four engine migrations"
+    assert_equal 4, migrations.size, "invokes the migrations generator for all four migrations"
     # Native copy re-timestamps and adds the `.angarium` engine scope suffix.
     endpoints = migrations.find { |f| File.basename(f).match?(/\A\d+_create_angarium_endpoints\.angarium\.rb\z/) }
     assert endpoints, "copies the endpoints migration (re-timestamped, scope-tagged)"

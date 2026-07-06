@@ -24,9 +24,16 @@ Angarium.configure do |config|
   # Primary key type for Angarium's own tables.
   # config.primary_key_type = nil # nil = use the app's default (bigint unless overridden); set :uuid etc. to force
 
-  # Multi-database: place Angarium's tables in their own database (passed straight
-  # to Rails' connects_to). Define the database in config/database.yml first.
-  # nil (default) keeps Angarium on the app's primary connection.
+  # Multi-database: keep Angarium's tables in their own database. Set this to a
+  # database name from config/database.yml and Angarium routes all its models and
+  # migrations there. `bin/rails g angarium:install --database=NAME` sets this for
+  # you; after a gem upgrade, `bin/rails g angarium:migrations` reads it so new
+  # migrations still land in db/NAME_migrate. nil (default) uses the primary connection.
+  # config.database = :angarium
+  #
+  # Advanced: for custom roles/shards, pass a hash straight to Rails' connects_to.
+  # It wins over config.database for the connection (set config.database too so the
+  # migrations generator knows where to install).
   # config.connects_to = { database: { writing: :angarium, reading: :angarium } }
 
   # Truncate the stored response body to this many bytes. nil = store the full body.

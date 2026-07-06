@@ -16,16 +16,16 @@ module Angarium
         template "initializer.rb", "config/initializers/angarium.rb"
       end
 
-      # With --database, wire up multi-db: point config.connects_to at the named
-      # database and install the engine's migrations into that database's own
-      # migrations_paths (db/NAME_migrate) so `db:migrate:NAME` targets them.
+      # With --database, wire up multi-db: record config.database in the
+      # initializer (so a later `angarium:migrations` run without the flag still
+      # targets the right place) and install the migrations into db/NAME_migrate.
       # Without it, Angarium stays on the primary connection and migrations are
-      # installed the usual way (`bin/rails angarium:install:migrations`).
+      # installed the usual way (`bin/rails g angarium:migrations`).
       def configure_database
         return unless database
 
-        enable_connects_to
-        install_migrations
+        set_database_config
+        invoke "angarium:migrations", [], database: database
         print_next_steps
       end
 
@@ -33,19 +33,9 @@ module Angarium
 
       def database = options[:database]
 
-      def enable_connects_to
-        gsub_file "config/initializers/angarium.rb", /^\s*#?\s*config\.connects_to\s*=.*$/,
-          %(  config.connects_to = { database: { writing: :#{database}, reading: :#{database} } })
-      end
-
-      def install_migrations
-        # Rails' native engine-migration copy (the same mechanism behind
-        # `angarium:install:migrations`), but pointed at this database's own
-        # migrations_paths instead of the primary db/migrate. It re-timestamps
-        # each file, tags it "This migration comes from angarium", and skips any
-        # already present, so re-running is safe.
-        destination = File.join(destination_root, "db", "#{database}_migrate")
-        ActiveRecord::Migration.copy(destination, {"angarium" => Angarium::Engine.root.join("db/migrate").to_s})
+      def set_database_config
+        gsub_file "config/initializers/angarium.rb", /^\s*#?\s*config\.database\s*=.*$/,
+          %(  config.database = :#{database})
       end
 
       def print_next_steps

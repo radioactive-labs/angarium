@@ -4,8 +4,13 @@ default: &default
   timeout: 5000
 
 development:
-  <<: *default
-  database: db/development.sqlite3
+  primary:
+    <<: *default
+    database: db/development.sqlite3
+  angarium:
+    <<: *default
+    database: db/angarium_development.sqlite3
+    migrations_paths: db/angarium_migrate
 
 test:
   <<: *default

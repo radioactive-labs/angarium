@@ -2,7 +2,7 @@ module Angarium
   class Configuration
     attr_accessor :job_queue, :http_timeout, :open_timeout, :user_agent,
       :retry_schedule, :block_private_ips,
-      :primary_key_type, :connects_to, :max_response_body_bytes,
+      :primary_key_type, :database, :connects_to, :max_response_body_bytes,
       :auto_disable_endpoint_after, :respect_retry_after,
       :max_retry_after, :retry_jitter, :signing_secret_grace_period,
       :delivery_attempt_retention, :delivering_timeout,
@@ -24,10 +24,14 @@ module Angarium
       ]
       @block_private_ips = true
       @primary_key_type = nil
-      # Multi-database: a hash passed to Rails' connects_to so Angarium's tables
-      # can live in their own database, e.g.
-      #   { database: { writing: :angarium, reading: :angarium } }
+      # Multi-database: the database (a key from config/database.yml) that
+      # Angarium's tables live in. Drives both the connection and where the
+      # migrations generator installs migrations (db/<database>_migrate).
       # nil (default) keeps Angarium on the app's primary connection.
+      @database = nil
+      # Advanced multi-database: a hash passed straight to Rails' connects_to for
+      # custom roles/shards, e.g. { database: { writing: :angarium, reading: :angarium } }.
+      # Takes precedence over @database for the connection.
       @connects_to = nil
       @max_response_body_bytes = 65_536
       @auto_disable_endpoint_after = nil
@@ -50,6 +54,13 @@ module Angarium
       # Authorization: scope, create-owner, and per-action permissions, all in one
       # class. Subclass Angarium::Api::Policy to customize any of them.
       @policy_class = "Angarium::Api::Policy"
+    end
+
+    # The database Angarium's migrations belong in, for the migrations generator.
+    # Prefers the explicit @database, else the writing role from a connects_to
+    # hash. nil => the app's primary db/migrate.
+    def migrations_database
+      database || connects_to&.dig(:database, :writing)
     end
   end
 end

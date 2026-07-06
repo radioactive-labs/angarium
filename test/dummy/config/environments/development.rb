@@ -62,4 +62,7 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # E2E: real async delivery via Solid Queue (single SQLite DB).
+  config.active_job.queue_adapter = :solid_queue
 end

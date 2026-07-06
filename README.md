@@ -671,11 +671,19 @@ any configuration.
 
 ### Multiple databases
 
-To keep Angarium's tables out of your primary database, set `config.connects_to`
-to a hash that Angarium passes straight to Rails'
-[`connects_to`](https://guides.rubyonrails.org/active_record_multiple_databases.html).
-All four Angarium models inherit from one abstract `Angarium::ApplicationRecord`,
-so this points the whole engine at the chosen database:
+To keep Angarium's tables out of your primary database, install with a
+`--database` flag. It records `config.database` and puts the migrations in that
+database's own path in one step:
+
+```bash
+bin/rails g angarium:install --database=angarium
+```
+
+That writes `config.database = :angarium` to your initializer and installs the
+engine's migrations into `db/angarium_migrate` (not the primary `db/migrate`), so
+each database keeps its own `schema_migrations`. All four Angarium models inherit
+from one abstract `Angarium::ApplicationRecord`, so `config.database` points the
+whole engine at that connection. Add the database to `database.yml`:
 
 ```ruby
 # config/database.yml
@@ -688,18 +696,21 @@ production:
     database: my_app_angarium
     migrations_paths: db/angarium_migrate
 
-# config/initializers/angarium.rb
+# config/initializers/angarium.rb (written by the generator)
 Angarium.configure do |c|
-  c.connects_to = { database: { writing: :angarium, reading: :angarium } }
+  c.database = :angarium
 end
 ```
 
-`bin/rails g angarium:install --database=angarium` sets that `connects_to` line
-for you and installs the migrations into `db/angarium_migrate` (instead of the
-primary `db/migrate`), so each database keeps its own `schema_migrations`. Add
-the database to `database.yml` as above, then run `bin/rails db:migrate:angarium`.
+then run `bin/rails db:migrate:angarium`. **After a gem upgrade**, pull in new
+migrations with `bin/rails g angarium:migrations` (no flag needed): it reads
+`config.database` and installs them into `db/angarium_migrate` for you.
 
-Left `nil` (the default), Angarium stays on the app's primary connection. The
+For custom roles or shards, set `config.connects_to` to a hash passed straight to
+Rails' [`connects_to`](https://guides.rubyonrails.org/active_record_multiple_databases.html)
+instead; it takes precedence over `config.database` for the connection.
+
+Left unset (the default), Angarium stays on the app's primary connection. The
 owner association still works across databases (it's a polymorphic reference, not
 a foreign key), so your `User`/`Account` can live in the primary database while
 Angarium's tables live in their own. This is independent of where your ActiveJob
