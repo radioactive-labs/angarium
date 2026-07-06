@@ -282,6 +282,10 @@ and the `on_endpoint_verified` callback fires. You can also verify manually with
 `endpoint.verify!`. Verification only promotes `unverified` endpoints; a
 `disabled` or `gone` endpoint is revived with `enable!`, never silently by a ping.
 
+Through the JSON API, set the `create_unverified?` policy predicate to `true` to
+create endpoints `unverified`, then `POST /endpoints/:id/ping` (which verifies on
+a successful delivery) or `POST /endpoints/:id/verify` to promote one manually.
+
 ### Auto-disabling failing endpoints
 
 Set `config.auto_disable_endpoint_after` to a number of **consecutive** failed
@@ -424,10 +428,11 @@ methods:
 | --- | --- | --- |
 | `scope(relation)` | `relation.where(owner: current_user)` | Narrows a base relation to the endpoints this user may see and act on. Reads, finds, and delivery/attempt access all go through it. |
 | `owner` | `current_user` | The owner assigned to a newly-created endpoint. Set before `create?` runs, so you can gate the target owner there via `record.owner`. |
+| `create_unverified?` | `false` | Whether endpoints created through the API start `unverified` (no deliveries until a successful ping verifies them) instead of live. |
 | `permit_allow_private_network?` | `false` | Whether `allow_private_network` (relax the private-IP block) is API-writable. Dangerous; trusted operators only. |
 | `permit_allowed_networks?` | `false` | Whether `allowed_networks` (a restrictive CIDR allowlist) is API-writable. |
 | `index?` `show?` `create?` `update?` `destroy?` | `true` | Whether each action is allowed. |
-| `rotate_secret?` `pause?` `enable?` `ping?` `redeliver?` | `update?` | Member actions; default to the `update?` capability. |
+| `rotate_secret?` `pause?` `enable?` `verify?` `ping?` `redeliver?` | `update?` | Member actions; default to the `update?` capability. |
 
 Override only what you need; the defaults are single-owner (you see and manage
 your own endpoints). A denied action returns `403`; anything outside `scope` is a
@@ -488,7 +493,7 @@ included (see the note below):
 | `PATCH /endpoints/:id` | `{ "endpoint": { "name": "New name" } }` | `200 { "endpoint": endpoint }` |
 | `DELETE /endpoints/:id` | none | `204` (no body) |
 | `POST /endpoints/:id/rotate_secret` | none | `200 { "endpoint": endpoint, "signing_secret": "whsec_..." }` |
-| `POST /endpoints/:id/pause`, `/enable` | none | `200 { "endpoint": endpoint }` |
+| `POST /endpoints/:id/pause`, `/enable`, `/verify` | none | `200 { "endpoint": endpoint }` |
 | `POST /endpoints/:id/ping` | none | `202 { "delivery": delivery }` |
 | `GET /endpoints/:id/deliveries?limit=&offset=` | none | `200 { "deliveries": [delivery, ...], "pagination": pagination }` |
 | `GET /deliveries/:id` | none | `200 { "delivery": delivery }` |

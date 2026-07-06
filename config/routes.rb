@@ -8,6 +8,7 @@ Angarium::Engine.routes.draw do
         post :rotate_secret
         post :pause
         post :enable
+        post :verify
         post :ping
       end
       resources :deliveries, only: %i[index]

@@ -15,6 +15,11 @@ class AllowlistPolicy < Angarium::Api::Policy
   def permit_allowed_networks? = true
 end
 
+# Requires new endpoints to prove themselves before going live.
+class VerifyFirstPolicy < Angarium::Api::Policy
+  def create_unverified? = true
+end
+
 class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
   setup do
     @owner = Owner.create!(name: "Acme")
@@ -154,6 +159,31 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     secret = JSON.parse(response.body)["signing_secret"]
     assert secret.start_with?("whsec_")
     refute_equal old, secret
+  end
+
+  test "create_unverified? policy creates endpoints in the unverified state" do
+    id = nil
+    Angarium.config.stub(:policy_class, "VerifyFirstPolicy") do
+      post "/angarium/endpoints",
+        params: {endpoint: {name: "Unv", url: "https://203.0.113.50/hook", subscribed_events: ["*"]}},
+        headers: auth(@owner), as: :json
+      id = JSON.parse(response.body)["endpoint"]["id"]
+    end
+    assert_response :created
+    assert Angarium::Endpoint.find(id).unverified?
+  end
+
+  test "verify promotes an unverified endpoint to enabled" do
+    @endpoint.update!(status: :unverified)
+    post "/angarium/endpoints/#{@endpoint.id}/verify", headers: auth(@owner)
+    assert_response :ok
+    assert @endpoint.reload.enabled?
+  end
+
+  test "verify is scoped: a foreign owner cannot verify" do
+    @endpoint.update!(status: :unverified)
+    post "/angarium/endpoints/#{@endpoint.id}/verify", headers: auth(@other)
+    assert @endpoint.reload.unverified?
   end
 
   test "pause and enable transition status" do

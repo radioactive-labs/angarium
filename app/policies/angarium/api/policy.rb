@@ -37,6 +37,13 @@ module Angarium
         current_user
       end
 
+      # Should endpoints created through the API start `unverified` (receiving no
+      # deliveries until a successful ping verifies them)? Default: no, they go
+      # live immediately. Override to require endpoints to prove themselves first.
+      def create_unverified?
+        false
+      end
+
       # May the API set allow_private_network? Default: no. This *relaxes* SSRF
       # protection (delivery to private/loopback addresses), so an end user who
       # can set it can point a webhook at your internal network. Trusted operators
@@ -63,6 +70,7 @@ module Angarium
       def rotate_secret? = update?
       def pause? = update?
       def enable? = update?
+      def verify? = update?
       def ping? = update?
       def redeliver? = update?
     end

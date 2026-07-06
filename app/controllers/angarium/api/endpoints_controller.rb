@@ -1,7 +1,7 @@
 module Angarium
   module Api
     class EndpointsController < BaseController
-      before_action :set_endpoint, only: %i[show update destroy rotate_secret pause enable ping]
+      before_action :set_endpoint, only: %i[show update destroy rotate_secret pause enable verify ping]
 
       def index
         authorize!
@@ -18,6 +18,7 @@ module Angarium
         # before authorize! so policy #create? can gate the target owner.
         endpoint = Angarium::Endpoint.new(endpoint_params)
         endpoint.owner = angarium_policy.owner
+        endpoint.status = :unverified if angarium_policy.create_unverified?
         authorize!(endpoint)
         endpoint.save!
         # The signing secret is revealed once, on creation.
@@ -51,6 +52,12 @@ module Angarium
       def enable
         authorize!(@endpoint)
         @endpoint.enable!
+        render json: {endpoint: endpoint_json(@endpoint)}
+      end
+
+      def verify
+        authorize!(@endpoint)
+        @endpoint.verify!
         render json: {endpoint: endpoint_json(@endpoint)}
       end
 
