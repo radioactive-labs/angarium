@@ -264,8 +264,11 @@ delivery's `410`). Each delivery re-checks the endpoint before it attempts:
 `paused` **holds** the delivery (it stays `pending`, consumes no attempt, and
 `enable!` re-enqueues it), while `disabled`/`gone` **cancels** it (a terminal
 `canceled` state, logged with the reason). Recover a canceled delivery after
-re-enabling with `delivery.redeliver!`. (No status transitions back to
-`unverified`, so a queued delivery never encounters an unverified endpoint.)
+re-enabling with `delivery.redeliver!`. (Nothing transitions back to
+`unverified`, so dispatched and retried deliveries never meet one; a non-forced
+delivery to an unverified endpoint would `cancel` like `disabled`/`gone`, since
+only `enabled` passes the guard. `ping!` forces past it, which is how
+verification happens.)
 
 ### Verifying an endpoint
 
@@ -277,7 +280,7 @@ until it is verified:
 endpoint = Angarium::Endpoint.create!(owner: current_user, url: params[:url],
   subscribed_events: ["*"], status: :unverified)
 
-endpoint.ping!             # a ping always sends, even to an unverified endpoint
+endpoint.ping!             # forces past the status guard (force: true default), so it sends
 endpoint.reload.enabled?   # => true once the ping is delivered (2xx)
 ```
 
@@ -324,8 +327,8 @@ Angarium.configure do |config|
 end
 ```
 
-Both are optional. A callback that raises is logged and swallowed, so a broken
-notifier never breaks delivery.
+All callbacks are optional. A callback that raises is logged and swallowed, so a
+broken notifier never breaks delivery.
 
 ### Recovering interrupted deliveries
 
@@ -716,7 +719,7 @@ Angarium.configure do |c|
 end
 ```
 
-then run `bin/rails db:migrate:angarium`. **After a gem upgrade**, pull in new
+Then run `bin/rails db:migrate:angarium`. **After a gem upgrade**, pull in new
 migrations with `bin/rails g angarium:migrations` (no flag needed): it reads
 `config.database` and installs them into `db/angarium_migrate` for you.
 
