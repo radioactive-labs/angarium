@@ -3,7 +3,8 @@ require "rails/generators/base"
 module Angarium
   module Generators
     # Installs (and, after a gem upgrade, refreshes) Angarium's engine migrations.
-    # Unlike the built-in `angarium:install:migrations` rake task, this is
+    # This is Angarium's single migration path (the engine unregisters db/migrate
+    # so Rails' generic install:migrations task is not generated). It is
     # multi-database aware: it reads config.database (set at install time) so a
     # host that forgets the flag on a later run still gets new migrations in the
     # right place. Uses Rails' native ActiveRecord::Migration.copy, so re-runs are

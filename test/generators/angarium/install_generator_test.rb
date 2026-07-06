@@ -12,9 +12,11 @@ class Angarium::InstallGeneratorTest < Rails::Generators::TestCase
     assert_file "config/initializers/angarium.rb", /Angarium.configure/
   end
 
-  test "without --database leaves config.database commented and installs no migrations" do
+  test "without --database leaves config.database commented and installs into db/migrate" do
     run_generator
     assert_file "config/initializers/angarium.rb", /^\s*#\s*config\.database\s*=/
+    assert Dir[File.join(destination_root, "db/migrate/*_create_angarium_endpoints.angarium.rb")].any?,
+      "installs migrations into the primary db/migrate"
     assert_empty Dir[File.join(destination_root, "db/angarium_migrate/*.rb")]
   end
 

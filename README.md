@@ -57,9 +57,13 @@ Then:
 
 ```bash
 bundle install
-bin/rails angarium:install:migrations
 bin/rails g angarium:install
+bin/rails db:migrate
 ```
+
+`angarium:install` writes the initializer and installs Angarium's migrations in
+one step. For a separate database, pass `--database=NAME` (see
+[Multiple databases](#multiple-databases)).
 
 ### Active Record Encryption
 
