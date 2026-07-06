@@ -6,8 +6,18 @@ Gem::Specification.new do |spec|
   spec.authors = ["TheDumbTechGuy"]
   spec.email = ["sfroelich01@gmail.com"]
   spec.homepage = "https://github.com/radioactive-labs/angarium"
-  spec.summary = "Outbound webhooks for Rails: signed, retried, subscription-based delivery."
-  spec.description = "A mountable Rails engine that delivers outbound webhooks with HMAC signing, automatic retries with exponential backoff, and per-endpoint event subscriptions."
+  spec.summary = "Outbound webhooks for Rails — Standard Webhooks signing, retries with backoff, secret rotation, SSRF protection, and a log of every attempt. Everything the hand-rolled version is missing."
+  spec.description = <<~DESC.tr("\n", " ").strip
+    The moment "just POST from a background job" ships to production, the gaps
+    start showing: your customers need signatures they can verify, failed
+    deliveries need to back off and retry for hours, secrets need to rotate
+    without downtime, an endpoint URL shouldn't be able to reach your internal
+    network, and sooner or later someone asks "did we actually send it?".
+    Angarium is a Rails engine that handles all of it, and signs to the Standard
+    Webhooks spec, so your receivers verify with off-the-shelf libraries in any
+    language and you never write verification docs of your own. That conformance
+    is enforced in CI: any drift from the spec fails the build.
+  DESC
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2"
 
