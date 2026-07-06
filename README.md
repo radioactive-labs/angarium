@@ -360,10 +360,10 @@ delivery = endpoint.ping!
 delivery.reload.succeeded? # => true once delivered
 ```
 
-A ping always sends, even to a `paused`, `disabled`, or `gone` endpoint, so you
-can test one before enabling it. Pass `endpoint.ping!(force: false)` to respect
-the endpoint status guard instead (held while `paused`, canceled while
-`disabled`/`gone`). The lower-level `delivery.deliver!(force: true)` and
+A ping always sends, even to an `unverified`, `paused`, `disabled`, or `gone`
+endpoint, so you can test one before enabling it. Pass
+`endpoint.ping!(force: false)` to respect the endpoint status guard instead (held
+while `paused`, canceled while `unverified`/`disabled`/`gone`). The lower-level `delivery.deliver!(force: true)` and
 `Delivery#redeliver!(force: true)` override the guard the same way, for a single
 attempt; any retry that attempt schedules follows the normal status rules again.
 
