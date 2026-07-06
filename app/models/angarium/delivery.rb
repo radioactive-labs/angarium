@@ -13,7 +13,12 @@ module Angarium
     belongs_to :endpoint, class_name: "Angarium::Endpoint"
     has_many :delivery_attempts, class_name: "Angarium::DeliveryAttempt", dependent: :destroy
 
-    after_create_commit { DeliverJob.perform_later(id) }
+    # Transient: set on a delivery built for a manual, forced send (e.g.
+    # endpoint.ping!(force: true)) so its first attempt bypasses the endpoint
+    # status guard. Not persisted; only the enqueued job carries it forward.
+    attr_accessor :force_send
+
+    after_create_commit { force_send ? DeliverJob.perform_later(id, true) : DeliverJob.perform_later(id) }
 
     # Recover deliveries stranded in "delivering": a worker set the state to
     # "delivering" (in #deliver!) but died (crash, deploy, OOM) before
@@ -36,13 +41,18 @@ module Angarium
 
     # Performs one attempt. Records a DeliveryAttempt, then transitions to
     # succeeded, blocked (SSRF), schedules a retry, or exhausts. Returns the attempt.
-    def deliver!(client: Client.new)
+    def deliver!(client: Client.new, force: false)
       # An endpoint's status can change after a delivery is queued: auto-disable
       # partway through a retry cycle, an operator pause!, or a 410 from a sibling
       # delivery. The dispatch-time `enabled` filter only gates delivery creation,
-      # not queued retries, so re-check here before attempting.
-      return hold_for_pause! if endpoint.paused?
-      return cancel!(reason: endpoint.status) unless endpoint.enabled?
+      # not queued retries, so re-check here before attempting. `force: true`
+      # (a manual ping!/redeliver!) overrides the guard for this one attempt, so
+      # you can test an endpoint before re-enabling it; any retry it schedules
+      # follows the normal status rules again.
+      unless force
+        return hold_for_pause! if endpoint.paused?
+        return cancel!(reason: endpoint.status) unless endpoint.enabled?
+      end
 
       update!(state: "delivering", attempt_count: attempt_count + 1, last_attempt_at: Time.current)
 
@@ -113,10 +123,11 @@ module Angarium
     end
 
     # Reset the retry cycle and re-enqueue immediately. Keeps prior
-    # DeliveryAttempt history. Returns self.
-    def redeliver!
+    # DeliveryAttempt history. `force: true` sends even if the endpoint is no
+    # longer enabled (for the re-enqueued attempt). Returns self.
+    def redeliver!(force: false)
       update!(state: "pending", next_attempt_at: nil, attempt_count: 0)
-      DeliverJob.perform_later(id)
+      force ? DeliverJob.perform_later(id, true) : DeliverJob.perform_later(id)
       self
     end
 

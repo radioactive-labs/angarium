@@ -324,6 +324,13 @@ delivery = endpoint.ping!
 delivery.reload.succeeded? # => true once delivered
 ```
 
+A ping to a non-`enabled` endpoint is subject to the status guard (held while
+`paused`, canceled while `disabled`/`gone`) like any other delivery. Pass
+`force: true` to send anyway, for example to test an endpoint before you
+re-enable it: `endpoint.ping!(force: true)`. `force` overrides the guard for
+that one attempt only; any retry it schedules follows the normal status rules
+again. `Delivery#redeliver!(force: true)` does the same for a re-send.
+
 ### At-least-once delivery
 
 Delivery is **at-least-once**: a webhook may arrive more than once, from a retry

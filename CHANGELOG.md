@@ -77,7 +77,10 @@ compatible.
 - Per-endpoint `custom_headers` sent with every delivery (the signature header
   always takes precedence).
 - `Endpoint#ping!` delivers a synthetic `angarium.ping` event, bypassing
-  subscription matching; returns the `Angarium::Delivery`.
+  subscription matching; returns the `Angarium::Delivery`. `ping!(force: true)`
+  (and `Delivery#redeliver!(force: true)`) send even to a non-enabled endpoint,
+  overriding the status guard for that one attempt, e.g. to test an endpoint
+  before re-enabling it.
 - Additive positive backoff jitter (`config.retry_jitter`) to avoid retry
   stampedes.
 - Dual-secret rotation grace: after `rotate_secret!`, deliveries are

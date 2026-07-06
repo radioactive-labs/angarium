@@ -208,6 +208,36 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     end
   end
 
+  test "deliver!(force: true) sends to a disabled endpoint, bypassing the status guard" do
+    @endpoint.update!(status: :disabled)
+    fake = succeeding_client
+    delivery = create_delivery
+    delivery.deliver!(client: fake, force: true)
+
+    assert delivery.reload.succeeded?, "forced delivery should send despite disabled status"
+    assert fake.requested?
+  end
+
+  test "ping!(force: true) delivers to a disabled endpoint" do
+    @endpoint.update!(status: :disabled)
+    delivery = @endpoint.ping!(force: true)
+    fake = succeeding_client
+    Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
+
+    assert fake.requested?, "forced ping should reach a disabled endpoint"
+    assert delivery.reload.succeeded?
+  end
+
+  test "ping! without force to a disabled endpoint is canceled, not delivered" do
+    @endpoint.update!(status: :disabled)
+    delivery = @endpoint.ping!
+    fake = succeeding_client
+    Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
+
+    assert delivery.reload.canceled?
+    refute fake.requested?
+  end
+
   test "deactivate! fires on_endpoint_deactivated once under a concurrent crossing" do
     fires = []
     with_config(:on_endpoint_deactivated, ->(_ep, reason) { fires << reason }) do
