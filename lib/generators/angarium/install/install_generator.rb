@@ -39,9 +39,13 @@ module Angarium
       end
 
       def install_migrations
-        Angarium::Engine.root.join("db/migrate").glob("*.rb").sort.each do |path|
-          create_file "db/#{database}_migrate/#{path.basename}", path.read
-        end
+        # Rails' native engine-migration copy (the same mechanism behind
+        # `angarium:install:migrations`), but pointed at this database's own
+        # migrations_paths instead of the primary db/migrate. It re-timestamps
+        # each file, tags it "This migration comes from angarium", and skips any
+        # already present, so re-running is safe.
+        destination = File.join(destination_root, "db", "#{database}_migrate")
+        ActiveRecord::Migration.copy(destination, {"angarium" => Angarium::Engine.root.join("db/migrate").to_s})
       end
 
       def print_next_steps
