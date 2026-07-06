@@ -242,4 +242,23 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     endpoint.record_delivery_success!
     assert_equal 0, endpoint.consecutive_failures
   end
+
+  # Concurrent deliveries to one endpoint each hold a separate in-memory copy of
+  # the row, so the counter updates must go to the database, not a stale copy.
+  test "record_delivery_failure! increments atomically (no lost update)" do
+    endpoint = build.tap(&:save!)
+    a = Angarium::Endpoint.find(endpoint.id)
+    b = Angarium::Endpoint.find(endpoint.id) # separate copy of the same row
+    a.record_delivery_failure!
+    b.record_delivery_failure! # a read-modify-write would clobber a's increment
+    assert_equal 2, endpoint.reload.consecutive_failures
+  end
+
+  test "record_delivery_success! resets from the database even when the copy is stale" do
+    endpoint = build.tap(&:save!)
+    stale = Angarium::Endpoint.find(endpoint.id) # sees consecutive_failures 0
+    endpoint.update!(consecutive_failures: 3)    # a concurrent failure raised it
+    stale.record_delivery_success!
+    assert_equal 0, endpoint.reload.consecutive_failures
+  end
 end

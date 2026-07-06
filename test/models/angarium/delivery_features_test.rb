@@ -161,6 +161,18 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     end
   end
 
+  test "deactivate! fires on_endpoint_deactivated once under a concurrent crossing" do
+    fires = []
+    with_config(:on_endpoint_deactivated, ->(_ep, reason) { fires << reason }) do
+      a = Angarium::Endpoint.find(@endpoint.id)
+      b = Angarium::Endpoint.find(@endpoint.id) # separate copy, both still see :enabled
+      a.deactivate!(reason: :consecutive_failures)
+      b.deactivate!(reason: :consecutive_failures) # must not fire again
+    end
+    assert_equal [:consecutive_failures], fires
+    assert @endpoint.reload.disabled?
+  end
+
   # --- Redeliver --------------------------------------------------------------
 
   test "redeliver! resets an exhausted delivery and re-enqueues" do

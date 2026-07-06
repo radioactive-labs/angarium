@@ -78,11 +78,21 @@ module Angarium
     end
 
     def record_delivery_success!
-      update!(consecutive_failures: 0) unless consecutive_failures.zero?
+      # Reset from the database, not this (possibly stale) in-memory copy: a
+      # concurrent failed delivery may have raised the counter since we loaded.
+      # The WHERE skips a write when it is already zero.
+      self.class.where(id: id).where.not(consecutive_failures: 0).update_all(consecutive_failures: 0)
+      self.consecutive_failures = 0
     end
 
     def record_delivery_failure!
-      update!(consecutive_failures: consecutive_failures + 1)
+      # Atomic increment. Without it, concurrent deliveries to the same endpoint
+      # each read a stale counter and lose increments (last write wins), so
+      # auto-disable would undercount. Reload to read the true post-increment
+      # count before deciding whether to disable.
+      self.class.update_counters(id, consecutive_failures: 1)
+      reload
+
       threshold = Angarium.config.auto_disable_endpoint_after
       deactivate!(reason: :consecutive_failures) if threshold && consecutive_failures >= threshold
     end
@@ -95,7 +105,17 @@ module Angarium
       target = (reason == :gone) ? :gone : :disabled
       return if status.to_sym == target
 
-      update!(status: target, status_changed_at: Time.current)
+      # Atomic, fire-once transition: only the call that actually flips the status
+      # (exactly one row updated) runs the callback, so concurrent threshold
+      # crossings can't double-fire it. Auto-disable only transitions an `enabled`
+      # endpoint, while `gone` (a terminal 410) can override any non-gone status,
+      # so a 410 is never clobbered by a racing auto-disable.
+      scope = self.class.where(id: id)
+      scope = (target == :gone) ? scope.where.not(status: "gone") : scope.where(status: "enabled")
+      changed = scope.update_all(status: target.to_s, status_changed_at: Time.current, updated_at: Time.current)
+      return if changed.zero?
+
+      reload
       Angarium.notify(:on_endpoint_deactivated, self, reason)
     end
 
