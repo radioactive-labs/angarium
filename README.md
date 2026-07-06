@@ -579,13 +579,32 @@ delivery-semantics guarantees; they have their own sections above.
 
 ## Configuration
 
-Run `bin/rails g angarium:install` to generate `config/initializers/angarium.rb`
-with all options: `job_queue`, `http_timeout`, `open_timeout`, `user_agent`,
-`retry_schedule`, `block_private_ips`, `primary_key_type`,
-`max_response_body_bytes`, `auto_disable_endpoint_after`, `respect_retry_after`,
-`max_retry_after`, `retry_jitter`, `signing_secret_grace_period`,
-`delivery_attempt_retention`, `delivering_timeout`, `on_delivery_exhausted`,
-and `on_endpoint_deactivated`.
+Run `bin/rails g angarium:install` to generate `config/initializers/angarium.rb`,
+which documents every option inline. The delivery and retry settings:
+
+| Option | Default | What it controls |
+| --- | --- | --- |
+| `job_queue` | `:default` | ActiveJob queue used for deliveries. |
+| `http_timeout` | `10` | HTTP read timeout (seconds) per attempt. |
+| `open_timeout` | `5` | TCP connect timeout (seconds) per attempt. |
+| `user_agent` | `"Angarium/<version>"` | User-Agent header on each delivery. |
+| `retry_schedule` | 12 delays over ~10 days | Backoff between retries; its length is the retry count. |
+| `retry_jitter` | `0.15` | Fraction of additive positive jitter on each backoff delay. |
+| `respect_retry_after` | `true` | Honor a receiver's `Retry-After` header (delay-only). |
+| `max_retry_after` | `3600` | Cap (seconds) on a honored `Retry-After`; `nil` is uncapped. |
+| `auto_disable_endpoint_after` | `nil` | Deactivate an endpoint after N consecutive failures; `nil` never does. |
+| `signing_secret_grace_period` | `24.hours` | How long a rotated endpoint's previous secret stays valid. |
+| `block_private_ips` | `true` | Reject endpoint URLs resolving to private/loopback addresses (SSRF). |
+| `max_response_body_bytes` | `65_536` | Truncate the stored response body; `nil` stores it whole. |
+| `delivery_attempt_retention` | `nil` | Age past which `angarium:prune` deletes attempts; `nil` keeps all. |
+| `delivering_timeout` | `15.minutes` | Age after which `angarium:reap` requeues a stuck `delivering` delivery. |
+| `primary_key_type` | `nil` | Primary key type for Angarium's tables (see below). |
+| `on_delivery_exhausted` | `nil` | Callback `->(delivery)` when a delivery exhausts its retries. |
+| `on_endpoint_deactivated` | `nil` | Callback `->(endpoint, reason)` when an endpoint is disabled or gone. |
+
+Mounting the JSON API adds `parent_controller`, `current_user`, and
+`policy_class` (see [Authentication](#authentication) and
+[Authorization](#authorization)).
 
 ### Primary keys
 
@@ -656,10 +675,9 @@ adopting external webhook infrastructure.
 | [SSRF protection](#security-ssrf-protection) | ✅ block + pin + fail-closed | ✅ private-IP blocking | ❌ | ❌ | ✅ |
 | [Signing secrets encrypted at rest](#active-record-encryption) | ✅ Active Record Encryption | n/a (you store secrets) | ❌ | ❌ | ✅ |
 | [Zero-downtime secret rotation](#rotating-a-signing-secret-zero-downtime) | ✅ dual-signing grace window | ❌ | ❌ | ❌ | ✅ |
-| Job backend | Any ActiveJob backend | n/a | ActiveJob | Multiple adapters | Own workers |
+| Job backend | Any ActiveJob backend | n/a | ActiveJob | Multiple adapters | Managed workers |
 | Runs inside your app | ✅ | ✅ | ✅ | ✅ | ❌ separate service |
-| Framework requirements | Rails 7.1+ | Any Ruby | Bullet Train | Rails 5+ (dated) | Any (HTTP API) |
-| Actively maintained | ✅ | Low activity | ✅ | Last release 2021 | ✅ |
+| Framework requirements | Rails 7.1+ | Any Ruby | Bullet Train | Rails 5+ | Any (HTTP API) |
 
 <sub>All columns verified by reading each project's source: actionhook 1.0.2,
 active_webhook 1.0.0, bullet_train-outgoing_webhooks 1.45.1, as of July 2026;
