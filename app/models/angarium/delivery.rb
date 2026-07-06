@@ -42,84 +42,104 @@ module Angarium
     # Performs one attempt. Records a DeliveryAttempt, then transitions to
     # succeeded, blocked (SSRF), schedules a retry, or exhausts. Returns the attempt.
     def deliver!(client: Client.new, force: false)
-      # An endpoint's status can change after a delivery is queued: auto-disable
-      # partway through a retry cycle, an operator pause!, or a 410 from a sibling
-      # delivery. The dispatch-time `enabled` filter only gates delivery creation,
-      # not queued retries, so re-check here before attempting. `force: true`
-      # (a manual ping!/redeliver!) overrides the guard for this one attempt, so
-      # you can test an endpoint before re-enabling it; any retry it schedules
-      # follows the normal status rules again.
-      unless force
-        return hold_for_pause! if endpoint.paused?
-        return cancel!(reason: endpoint.status) unless endpoint.enabled?
+      payload = {delivery_id: id, endpoint_id: endpoint_id, event: event.name, force: force}
+      ActiveSupport::Notifications.instrument("deliver.angarium", payload) do
+        # An endpoint's status can change after a delivery is queued: auto-disable
+        # partway through a retry cycle, an operator pause!, or a 410 from a sibling
+        # delivery. The dispatch-time `enabled` filter only gates delivery creation,
+        # not queued retries, so re-check here before attempting. `force: true`
+        # (a manual ping!/redeliver!) overrides the guard for this one attempt, so
+        # you can test an endpoint before re-enabling it; any retry it schedules
+        # follows the normal status rules again.
+        unless force
+          if endpoint.paused?
+            payload[:outcome] = :held
+            return hold_for_pause!
+          end
+          unless endpoint.enabled?
+            payload[:outcome] = :canceled
+            return cancel!(reason: endpoint.status)
+          end
+        end
+
+        update!(state: "delivering", attempt_count: attempt_count + 1, last_attempt_at: Time.current)
+        payload[:attempt] = attempt_count
+
+        # Re-resolve at delivery time (rather than trusting the save-time check)
+        # to catch DNS rebinding: a host that now resolves to a private/disallowed
+        # IP is blocked even if it was fine when the endpoint was saved. Any
+        # disallowed resolved address is a terminal block.
+        addresses = AddressPolicy.resolve(destination_host)
+
+        if addresses.any? { |ip| !AddressPolicy.ip_allowed?(ip, endpoint) }
+          payload[:outcome] = :blocked
+          payload[:error] = "blocked: destination address not permitted"
+          attempt = delivery_attempts.create!(error: payload[:error])
+          update!(state: "blocked", next_attempt_at: nil)
+          endpoint.record_delivery_failure!
+          return attempt
+        end
+
+        # Fail closed: our resolver is the single source of truth. If we can't
+        # resolve the host, do NOT let HTTPX resolve it unvalidated; record a
+        # retryable failure. A transient DNS blip is retried; a persistently
+        # unresolvable host eventually exhausts.
+        if addresses.empty?
+          payload[:outcome] = :unresolvable
+          payload[:error] = "unresolvable host: #{destination_host}"
+          attempt = delivery_attempts.create!(error: payload[:error])
+          handle_failure!
+          return attempt
+        end
+
+        body = request_body
+        ts = Time.now.to_i
+        webhook_id = id.to_s
+        signature = Signature.sign(payload: body, id: webhook_id, timestamp: ts, secret: endpoint.active_signing_secrets)
+        headers = (endpoint.custom_headers || {}).merge(
+          "webhook-id" => webhook_id,
+          "webhook-timestamp" => ts.to_s,
+          "webhook-signature" => signature
+        )
+        result = client.post(
+          endpoint.url,
+          body: body,
+          headers: headers,
+          # Pin the connection to exactly the IP(s) we just validated, so HTTPX
+          # can't re-resolve and connect somewhere else after our check (the
+          # rebinding window). TLS SNI/cert verification still uses the URL's
+          # host. `addresses` is guaranteed non-empty here (the fail-closed
+          # branch above returned early otherwise), so the connection always pins.
+          addresses: addresses.map(&:to_s)
+        )
+
+        attempt = delivery_attempts.create!(
+          response_code: result.code,
+          response_body: result.body,
+          error: result.error,
+          duration: result.duration
+        )
+        payload[:code] = result.code
+        payload[:http_duration] = result.duration
+        payload[:error] = result.error
+
+        # Status handling follows the Standard Webhooks receiver-etiquette guidance:
+        #   2xx           -> success
+        #   410 Gone      -> the receiver wants no more webhooks: disable + stop (terminal)
+        #   everything else (3xx, 429, 5xx, ...) -> retryable failure. 429/502/504
+        #     ("throttle" codes) are retried with backoff and honor Retry-After.
+        if result.success?
+          payload[:outcome] = :delivered
+          succeed!
+        elsif result.code == 410
+          payload[:outcome] = :gone
+          handle_gone!
+        else
+          payload[:outcome] = :failed
+          handle_failure!(retry_after: retry_after_seconds(result.headers))
+        end
+        attempt
       end
-
-      update!(state: "delivering", attempt_count: attempt_count + 1, last_attempt_at: Time.current)
-
-      # Re-resolve at delivery time (rather than trusting the save-time check)
-      # to catch DNS rebinding: a host that now resolves to a private/disallowed
-      # IP is blocked even if it was fine when the endpoint was saved. Any
-      # disallowed resolved address is a terminal block.
-      addresses = AddressPolicy.resolve(destination_host)
-
-      if addresses.any? { |ip| !AddressPolicy.ip_allowed?(ip, endpoint) }
-        attempt = delivery_attempts.create!(error: "blocked: destination address not permitted")
-        update!(state: "blocked", next_attempt_at: nil)
-        endpoint.record_delivery_failure!
-        return attempt
-      end
-
-      # Fail closed: our resolver is the single source of truth. If we can't
-      # resolve the host, do NOT let HTTPX resolve it unvalidated; record a
-      # retryable failure. A transient DNS blip is retried; a persistently
-      # unresolvable host eventually exhausts.
-      if addresses.empty?
-        attempt = delivery_attempts.create!(error: "unresolvable host: #{destination_host}")
-        handle_failure!
-        return attempt
-      end
-
-      body = request_body
-      ts = Time.now.to_i
-      webhook_id = id.to_s
-      signature = Signature.sign(payload: body, id: webhook_id, timestamp: ts, secret: endpoint.active_signing_secrets)
-      headers = (endpoint.custom_headers || {}).merge(
-        "webhook-id" => webhook_id,
-        "webhook-timestamp" => ts.to_s,
-        "webhook-signature" => signature
-      )
-      result = client.post(
-        endpoint.url,
-        body: body,
-        headers: headers,
-        # Pin the connection to exactly the IP(s) we just validated, so HTTPX
-        # can't re-resolve and connect somewhere else after our check (the
-        # rebinding window). TLS SNI/cert verification still uses the URL's
-        # host. `addresses` is guaranteed non-empty here (the fail-closed
-        # branch above returned early otherwise), so the connection always pins.
-        addresses: addresses.map(&:to_s)
-      )
-
-      attempt = delivery_attempts.create!(
-        response_code: result.code,
-        response_body: result.body,
-        error: result.error,
-        duration: result.duration
-      )
-
-      # Status handling follows the Standard Webhooks receiver-etiquette guidance:
-      #   2xx           -> success
-      #   410 Gone      -> the receiver wants no more webhooks: disable + stop (terminal)
-      #   everything else (3xx, 429, 5xx, ...) -> retryable failure. 429/502/504
-      #     ("throttle" codes) are retried with backoff and honor Retry-After.
-      if result.success?
-        succeed!
-      elsif result.code == 410
-        handle_gone!
-      else
-        handle_failure!(retry_after: retry_after_seconds(result.headers))
-      end
-      attempt
     end
 
     # Reset the retry cycle and re-enqueue immediately. Keeps prior
