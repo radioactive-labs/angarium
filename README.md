@@ -79,9 +79,9 @@ Add the generated keys to your credentials (`config/credentials.yml.enc`) or
 set `config.active_record.encryption.{primary_key,deterministic_key,key_derivation_salt}`.
 See the [Rails guide on Active Record Encryption](https://guides.rubyonrails.org/active_record_encryption.html).
 
-```bash
-bin/rails db:migrate
-```
+The migration above creates plain columns, so you can run it before or after
+setting up keys: encryption applies when rows are written, not when the table is
+created.
 
 ## Dispatching events
 
@@ -264,7 +264,8 @@ delivery's `410`). Each delivery re-checks the endpoint before it attempts:
 `paused` **holds** the delivery (it stays `pending`, consumes no attempt, and
 `enable!` re-enqueues it), while `disabled`/`gone` **cancels** it (a terminal
 `canceled` state, logged with the reason). Recover a canceled delivery after
-re-enabling with `delivery.redeliver!`.
+re-enabling with `delivery.redeliver!`. (No status transitions back to
+`unverified`, so a queued delivery never encounters an unverified endpoint.)
 
 ### Verifying an endpoint
 
@@ -303,7 +304,10 @@ regardless of this setting.)
 
 When delivery fails for good, the Standard Webhooks guidance is to notify the
 consumer out of band (email, Slack, PagerDuty). Angarium is headless, so it hands
-you the events and lets you do the notifying via two config callbacks:
+you the events and lets you do the notifying via config callbacks. Two fire when
+delivery fails for good; a third, `on_endpoint_verified`, fires when an
+`unverified` endpoint passes its first delivery (see
+[Verifying an endpoint](#verifying-an-endpoint)):
 
 ```ruby
 Angarium.configure do |config|
@@ -607,11 +611,12 @@ we hold ourselves to.
 What Angarium actually promises about delivery, so a receiver knows what it can
 rely on:
 
-- **At-least-once, not exactly-once.** A delivery is retried until it succeeds or
-  the schedule is exhausted, so the same event can arrive more than once (for
-  example, a retry after your `200` was lost in transit). Every request carries a
-  `webhook-id` that stays constant across a delivery's retries: dedupe on it and
-  treat repeats as no-ops.
+- **At-least-once, not exactly-once.** A delivery is retried until it succeeds,
+  the schedule is exhausted, or its endpoint is deactivated mid-cycle (the
+  delivery is `canceled`, kept, and recoverable with `redeliver!`), so the same
+  event can arrive more than once (for example, a retry after your `200` was lost
+  in transit). Every request carries a `webhook-id` that stays constant across a
+  delivery's retries: dedupe on it and treat repeats as no-ops.
 - **No ordering.** Deliveries are independent jobs and each retries on its own
   schedule, so events can arrive out of order. If order matters, put a sequence
   number or timestamp in the payload and sort on the receiver.
@@ -656,7 +661,8 @@ which documents every option inline. The delivery and retry settings:
 
 Mounting the JSON API adds `parent_controller`, `current_user`, and
 `policy_class` (see [Authentication](#authentication) and
-[Authorization](#authorization)).
+[Authorization](#authorization)). Multi-database setups add `database` and
+`connects_to` (see [Multiple databases](#multiple-databases)).
 
 ### Primary keys
 
@@ -689,7 +695,7 @@ each database keeps its own `schema_migrations`. All four Angarium models inheri
 from one abstract `Angarium::ApplicationRecord`, so `config.database` points the
 whole engine at that connection. Add the database to `database.yml`:
 
-```ruby
+```yaml
 # config/database.yml
 production:
   primary:
@@ -699,8 +705,12 @@ production:
     <<: *default
     database: my_app_angarium
     migrations_paths: db/angarium_migrate
+```
 
-# config/initializers/angarium.rb (written by the generator)
+The generator has already written the matching initializer:
+
+```ruby
+# config/initializers/angarium.rb
 Angarium.configure do |c|
   c.database = :angarium
 end
