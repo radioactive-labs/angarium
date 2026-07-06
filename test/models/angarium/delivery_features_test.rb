@@ -218,19 +218,19 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     assert fake.requested?
   end
 
-  test "ping!(force: true) delivers to a disabled endpoint" do
+  test "ping! delivers to a disabled endpoint by default (a ping always pings)" do
     @endpoint.update!(status: :disabled)
-    delivery = @endpoint.ping!(force: true)
+    delivery = @endpoint.ping!
     fake = succeeding_client
     Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
 
-    assert fake.requested?, "forced ping should reach a disabled endpoint"
+    assert fake.requested?, "a ping should reach a disabled endpoint"
     assert delivery.reload.succeeded?
   end
 
-  test "ping! without force to a disabled endpoint is canceled, not delivered" do
+  test "ping!(force: false) respects the status guard and is canceled on a disabled endpoint" do
     @endpoint.update!(status: :disabled)
-    delivery = @endpoint.ping!
+    delivery = @endpoint.ping!(force: false)
     fake = succeeding_client
     Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
 

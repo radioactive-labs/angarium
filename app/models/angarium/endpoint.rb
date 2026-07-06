@@ -135,11 +135,12 @@ module Angarium
     end
 
     # Deliver a synthetic `angarium.ping` event to this endpoint, bypassing
-    # subscription matching (a ping is always sent). Returns the created
-    # Angarium::Delivery, whose after_create_commit enqueues the DeliverJob;
-    # reload it to inspect the outcome. Pass `force: true` to send even when the
-    # endpoint is paused/disabled/gone, e.g. to test it before re-enabling.
-    def ping!(payload = {message: "Angarium ping"}, force: false)
+    # subscription matching (a ping is always sent). By default a ping also
+    # ignores the endpoint's status, so you can test an endpoint that is paused,
+    # disabled, or not yet enabled; pass `force: false` to respect the status
+    # guard instead. Returns the created Angarium::Delivery, whose
+    # after_create_commit enqueues the DeliverJob; reload it to inspect the outcome.
+    def ping!(payload = {message: "Angarium ping"}, force: true)
       event = Angarium::Event.create!(name: "angarium.ping", payload: payload)
       deliveries.create!(event: event) { |d| d.force_send = force }
     end

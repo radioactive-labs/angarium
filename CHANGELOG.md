@@ -58,9 +58,7 @@ compatible.
 - Endpoint lifecycle `status` enum (`enabled`/`paused`/`disabled`/`gone`,
   replacing the old boolean `active`), with `pause!`/`enable!` transitions,
   `status_changed_at`, and an `Endpoint.enabled` scope. Only `enabled` endpoints
-  receive deliveries; a delivery already queued when its endpoint leaves `enabled`
-  is re-checked at attempt time and held (`paused`, re-enqueued by `enable!`) or
-  moved to a terminal `canceled` state (`disabled`/`gone`) instead of delivered.
+  receive deliveries.
 - Endpoint auto-disable after `config.auto_disable_endpoint_after` consecutive
   failed deliveries (moves status to `disabled`), resetting the counter on success.
 - Standard Webhooks status-code handling: `410 Gone` disables the endpoint
@@ -77,10 +75,7 @@ compatible.
 - Per-endpoint `custom_headers` sent with every delivery (the signature header
   always takes precedence).
 - `Endpoint#ping!` delivers a synthetic `angarium.ping` event, bypassing
-  subscription matching; returns the `Angarium::Delivery`. `ping!(force: true)`
-  (and `Delivery#redeliver!(force: true)`) send even to a non-enabled endpoint,
-  overriding the status guard for that one attempt, e.g. to test an endpoint
-  before re-enabling it.
+  subscription matching; returns the `Angarium::Delivery`.
 - Additive positive backoff jitter (`config.retry_jitter`) to avoid retry
   stampedes.
 - Dual-secret rotation grace: after `rotate_secret!`, deliveries are

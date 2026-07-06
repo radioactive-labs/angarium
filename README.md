@@ -324,12 +324,12 @@ delivery = endpoint.ping!
 delivery.reload.succeeded? # => true once delivered
 ```
 
-A ping to a non-`enabled` endpoint is subject to the status guard (held while
-`paused`, canceled while `disabled`/`gone`) like any other delivery. Pass
-`force: true` to send anyway, for example to test an endpoint before you
-re-enable it: `endpoint.ping!(force: true)`. `force` overrides the guard for
-that one attempt only; any retry it schedules follows the normal status rules
-again. `Delivery#redeliver!(force: true)` does the same for a re-send.
+A ping always sends, even to a `paused`, `disabled`, or `gone` endpoint, so you
+can test one before enabling it. Pass `endpoint.ping!(force: false)` to respect
+the endpoint status guard instead (held while `paused`, canceled while
+`disabled`/`gone`). The lower-level `delivery.deliver!(force: true)` and
+`Delivery#redeliver!(force: true)` override the guard the same way, for a single
+attempt; any retry that attempt schedules follows the normal status rules again.
 
 ### At-least-once delivery
 
