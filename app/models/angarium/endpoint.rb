@@ -21,10 +21,12 @@ module Angarium
     encrypts :custom_headers
 
     # Lifecycle status. `enabled` endpoints receive deliveries; the rest don't.
-    #   paused:   turned off manually (resumable via #enable!)
-    #   disabled: auto-disabled after too many consecutive failures (resumable)
-    #   gone:     the receiver returned HTTP 410; treat as terminal
-    enum :status, {enabled: "enabled", paused: "paused", disabled: "disabled", gone: "gone"},
+    #   unverified: created but not yet proven; verified by a successful delivery
+    #               (a forced #ping!) or #verify!, which moves it to `enabled`
+    #   paused:     turned off manually (resumable via #enable!)
+    #   disabled:   auto-disabled after too many consecutive failures (resumable)
+    #   gone:       the receiver returned HTTP 410; treat as terminal
+    enum :status, {enabled: "enabled", paused: "paused", disabled: "disabled", gone: "gone", unverified: "unverified"},
       default: :enabled
 
     # Rails < 8.1's SQLite adapter doesn't parse the `DEFAULT FALSE` literal
@@ -132,6 +134,23 @@ module Angarium
       # scheduled attempt). Dispatch creates none while paused, so this only
       # re-enqueues the held ones.
       deliveries.where(state: "pending", next_attempt_at: nil).find_each { |d| DeliverJob.perform_later(d.id) }
+    end
+
+    # Promote an `unverified` endpoint to `enabled` once it has proven it can
+    # receive webhooks. A no-op on any other status: a `disabled`/`gone` endpoint
+    # is revived with #enable!, not verified. Called automatically when a delivery
+    # to an unverified endpoint succeeds (a forced #ping!), or manually. The
+    # atomic conditional update fires on_endpoint_verified exactly once even if
+    # two deliveries verify concurrently.
+    def verify!
+      return unless unverified?
+
+      changed = self.class.where(id: id, status: "unverified")
+        .update_all(status: "enabled", status_changed_at: Time.current, updated_at: Time.current)
+      return if changed.zero?
+
+      reload
+      Angarium.notify(:on_endpoint_verified, self)
     end
 
     # Deliver a synthetic `angarium.ping` event to this endpoint, bypassing

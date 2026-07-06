@@ -6,6 +6,7 @@ class Angarium::DispatchTest < ActiveSupport::TestCase
     @subscribed = endpoint(subscribed_events: ["invoice.*"])
     @other = endpoint(subscribed_events: ["user.created"])
     @inactive = endpoint(subscribed_events: ["*"], status: :disabled)
+    @unverified = endpoint(subscribed_events: ["*"], status: :unverified)
   end
 
   def endpoint(attrs)

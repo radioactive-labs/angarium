@@ -154,6 +154,9 @@ module Angarium
     def succeed!
       update!(state: "succeeded", next_attempt_at: nil)
       endpoint.record_delivery_success!
+      # A successful delivery to an unverified endpoint (a forced ping!) proves it
+      # can receive webhooks, so verify it. No-op for any other status.
+      endpoint.verify!
     end
 
     # HTTP 410 Gone: the receiver is explicitly done with this endpoint. Per the

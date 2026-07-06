@@ -6,7 +6,7 @@ module Angarium
       :auto_disable_endpoint_after, :respect_retry_after,
       :max_retry_after, :retry_jitter, :signing_secret_grace_period,
       :delivery_attempt_retention, :delivering_timeout,
-      :on_delivery_exhausted, :on_endpoint_deactivated,
+      :on_delivery_exhausted, :on_endpoint_deactivated, :on_endpoint_verified,
       :parent_controller, :current_user, :policy_class
 
     def initialize
@@ -34,6 +34,7 @@ module Angarium
       @delivering_timeout = 15.minutes
       @on_delivery_exhausted = nil # ->(delivery) { ... }
       @on_endpoint_deactivated = nil # ->(endpoint, reason) { ... } reason: :consecutive_failures | :gone
+      @on_endpoint_verified = nil # ->(endpoint) { ... } fired when an unverified endpoint is verified
 
       # --- Headless JSON API (only used if you mount Angarium::Engine) ---------
       # Base controller the API inherits from, so your app's authentication

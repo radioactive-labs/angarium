@@ -238,6 +238,29 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     refute fake.requested?
   end
 
+  test "a successful ping verifies an unverified endpoint" do
+    @endpoint.update!(status: :unverified)
+    delivery = @endpoint.ping!
+    fake = succeeding_client
+    Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
+
+    assert delivery.reload.succeeded?
+    assert @endpoint.reload.enabled?, "a successful ping should verify the endpoint"
+  end
+
+  test "on_endpoint_verified fires once when an unverified endpoint is verified" do
+    @endpoint.update!(status: :unverified)
+    verified = []
+    with_config(:on_endpoint_verified, ->(ep) { verified << ep.id }) do
+      a = Angarium::Endpoint.find(@endpoint.id)
+      b = Angarium::Endpoint.find(@endpoint.id) # both still see :unverified
+      a.verify!
+      b.verify! # must not fire again
+    end
+    assert_equal [@endpoint.id], verified
+    assert @endpoint.reload.enabled?
+  end
+
   test "deactivate! fires on_endpoint_deactivated once under a concurrent crossing" do
     fires = []
     with_config(:on_endpoint_deactivated, ->(_ep, reason) { fires << reason }) do

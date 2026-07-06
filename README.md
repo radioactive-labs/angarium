@@ -245,6 +245,7 @@ deliveries):
 
 | Status | Meaning | Resumable? |
 | --- | --- | --- |
+| `unverified` | Created but not yet proven (opt-in). Receives no dispatched deliveries. | verified by a successful `ping!`, or `endpoint.verify!` |
 | `enabled` | Delivering normally. | n/a |
 | `paused` | Turned off manually (`endpoint.pause!`). | `endpoint.enable!` |
 | `disabled` | Auto-disabled after too many consecutive failures. | `endpoint.enable!` |
@@ -260,6 +261,26 @@ delivery's `410`). Each delivery re-checks the endpoint before it attempts:
 `enable!` re-enqueues it), while `disabled`/`gone` **cancels** it (a terminal
 `canceled` state, logged with the reason). Recover a canceled delivery after
 re-enabling with `delivery.redeliver!`.
+
+### Verifying an endpoint
+
+Create an endpoint as `unverified` to make it prove itself before it receives any
+events. An unverified endpoint is excluded from dispatch, so no webhooks are sent
+until it is verified:
+
+```ruby
+endpoint = Angarium::Endpoint.create!(owner: current_user, url: params[:url],
+  subscribed_events: ["*"], status: :unverified)
+
+endpoint.ping!             # a ping always sends, even to an unverified endpoint
+endpoint.reload.enabled?   # => true once the ping is delivered (2xx)
+```
+
+A successful delivery to an unverified endpoint (a `ping!` in practice, since
+dispatch skips unverified endpoints) verifies it: the status moves to `enabled`
+and the `on_endpoint_verified` callback fires. You can also verify manually with
+`endpoint.verify!`. Verification only promotes `unverified` endpoints; a
+`disabled` or `gone` endpoint is revived with `enable!`, never silently by a ping.
 
 ### Auto-disabling failing endpoints
 
@@ -622,6 +643,7 @@ which documents every option inline. The delivery and retry settings:
 | `primary_key_type` | `nil` | Primary key type for Angarium's tables (see below). |
 | `on_delivery_exhausted` | `nil` | Callback `->(delivery)` when a delivery exhausts its retries. |
 | `on_endpoint_deactivated` | `nil` | Callback `->(endpoint, reason)` when an endpoint is disabled or gone. |
+| `on_endpoint_verified` | `nil` | Callback `->(endpoint)` when an `unverified` endpoint is verified. |
 
 Mounting the JSON API adds `parent_controller`, `current_user`, and
 `policy_class` (see [Authentication](#authentication) and

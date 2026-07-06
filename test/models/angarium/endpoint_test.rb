@@ -261,4 +261,25 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     stale.record_delivery_success!
     assert_equal 0, endpoint.reload.consecutive_failures
   end
+
+  test "an unverified endpoint is excluded from the enabled scope" do
+    endpoint = build(status: :unverified).tap(&:save!)
+    assert endpoint.unverified?
+    assert_not_includes Angarium::Endpoint.enabled, endpoint
+  end
+
+  test "verify! promotes an unverified endpoint to enabled" do
+    endpoint = build(status: :unverified).tap(&:save!)
+    endpoint.verify!
+    assert endpoint.enabled?
+    assert endpoint.status_changed_at.present?
+  end
+
+  test "verify! is a no-op on a non-unverified endpoint (does not revive a disabled one)" do
+    endpoint = build.tap(&:save!)
+    Angarium.config.stub(:auto_disable_endpoint_after, 1) { endpoint.record_delivery_failure! }
+    assert endpoint.disabled?
+    endpoint.verify!
+    assert endpoint.reload.disabled?
+  end
 end

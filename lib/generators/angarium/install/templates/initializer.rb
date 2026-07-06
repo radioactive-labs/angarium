@@ -48,6 +48,7 @@ Angarium.configure do |config|
   # and swallowed, so it never breaks delivery.
   # config.on_delivery_exhausted = ->(delivery) { }         # retry schedule exhausted
   # config.on_endpoint_deactivated = ->(endpoint, reason) { } # reason: :consecutive_failures | :gone (HTTP 410)
+  # config.on_endpoint_verified = ->(endpoint) { }          # an `unverified` endpoint passed its first delivery
 
   # --- Headless JSON API (only used if you `mount Angarium::Engine`) -----------
   # Base controller the API inherits from, so your app's authentication applies.
