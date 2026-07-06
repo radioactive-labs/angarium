@@ -694,6 +694,11 @@ Angarium.configure do |c|
 end
 ```
 
+`bin/rails g angarium:install --database=angarium` sets that `connects_to` line
+for you and installs the migrations into `db/angarium_migrate` (instead of the
+primary `db/migrate`), so each database keeps its own `schema_migrations`. Add
+the database to `database.yml` as above, then run `bin/rails db:migrate:angarium`.
+
 Left `nil` (the default), Angarium stays on the app's primary connection. The
 owner association still works across databases (it's a polymorphic reference, not
 a foreign key), so your `User`/`Account` can live in the primary database while
