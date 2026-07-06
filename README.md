@@ -669,6 +669,37 @@ integer-keyed `User` and a UUID-keyed `Account` in the same app). This works
 transparently with any owner primary key (integer, UUID, or a mix) without
 any configuration.
 
+### Multiple databases
+
+To keep Angarium's tables out of your primary database, set `config.connects_to`
+to a hash that Angarium passes straight to Rails'
+[`connects_to`](https://guides.rubyonrails.org/active_record_multiple_databases.html).
+All four Angarium models inherit from one abstract `Angarium::ApplicationRecord`,
+so this points the whole engine at the chosen database:
+
+```ruby
+# config/database.yml
+production:
+  primary:
+    <<: *default
+    database: my_app_production
+  angarium:
+    <<: *default
+    database: my_app_angarium
+    migrations_paths: db/angarium_migrate
+
+# config/initializers/angarium.rb
+Angarium.configure do |c|
+  c.connects_to = { database: { writing: :angarium, reading: :angarium } }
+end
+```
+
+Left `nil` (the default), Angarium stays on the app's primary connection. The
+owner association still works across databases (it's a polymorphic reference, not
+a foreign key), so your `User`/`Account` can live in the primary database while
+Angarium's tables live in their own. This is independent of where your ActiveJob
+backend (Solid Queue, etc.) stores its own tables.
+
 ## Why not just POST from a job?
 
 `HTTP.post(endpoint.url, body: payload)` in a background job works right up

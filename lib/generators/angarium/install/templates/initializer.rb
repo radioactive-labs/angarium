@@ -24,6 +24,11 @@ Angarium.configure do |config|
   # Primary key type for Angarium's own tables.
   # config.primary_key_type = nil # nil = use the app's default (bigint unless overridden); set :uuid etc. to force
 
+  # Multi-database: place Angarium's tables in their own database (passed straight
+  # to Rails' connects_to). Define the database in config/database.yml first.
+  # nil (default) keeps Angarium on the app's primary connection.
+  # config.connects_to = { database: { writing: :angarium, reading: :angarium } }
+
   # Truncate the stored response body to this many bytes. nil = store the full body.
   # config.max_response_body_bytes = 65_536
 

@@ -2,7 +2,7 @@ module Angarium
   class Configuration
     attr_accessor :job_queue, :http_timeout, :open_timeout, :user_agent,
       :retry_schedule, :block_private_ips,
-      :primary_key_type, :max_response_body_bytes,
+      :primary_key_type, :connects_to, :max_response_body_bytes,
       :auto_disable_endpoint_after, :respect_retry_after,
       :max_retry_after, :retry_jitter, :signing_secret_grace_period,
       :delivery_attempt_retention, :delivering_timeout,
@@ -24,6 +24,11 @@ module Angarium
       ]
       @block_private_ips = true
       @primary_key_type = nil
+      # Multi-database: a hash passed to Rails' connects_to so Angarium's tables
+      # can live in their own database, e.g.
+      #   { database: { writing: :angarium, reading: :angarium } }
+      # nil (default) keeps Angarium on the app's primary connection.
+      @connects_to = nil
       @max_response_body_bytes = 65_536
       @auto_disable_endpoint_after = nil
       @respect_retry_after = true
