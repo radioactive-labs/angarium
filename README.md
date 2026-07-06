@@ -472,7 +472,9 @@ included (see the note below):
 ### Permitted attributes
 
 `POST`/`PATCH /endpoints` accept these keys under `endpoint`; anything else is
-ignored (strong parameters):
+ignored (strong parameters). The exception is the two privileged controls below:
+when your policy hasn't permitted them, they are **rejected with a `422`, not
+silently ignored**, so an attempt to enable one never looks like it succeeded.
 
 | Attribute | Type | Notes |
 | --- | --- | --- |
@@ -550,6 +552,10 @@ resolvable *only* via non-DNS mechanisms Angarium's resolver doesn't use
 (e.g. mDNS `.local`) won't be delivered to, which is not a concern for real
 webhook endpoints. HTTPX does not follow redirects, so redirect-based
 bypasses are already closed.
+
+Found a gap in any of this? Report it privately: see [SECURITY.md](SECURITY.md)
+for the disclosure process (GitHub's private advisory workflow) and the surfaces
+we hold ourselves to.
 
 ## Delivery guarantees
 
