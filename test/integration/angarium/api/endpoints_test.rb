@@ -82,6 +82,21 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     assert_equal({"limit" => 2, "offset" => 1, "count" => 2, "total" => 3}, body["pagination"])
   end
 
+  test "index tolerates non-scalar pagination params instead of 500ing" do
+    get "/angarium/endpoints", headers: auth(@owner), params: {limit: {evil: "1"}, offset: ["9"]}
+    assert_response :ok
+    body = JSON.parse(response.body)
+    assert body.key?("endpoints")
+    assert_equal 50, body["pagination"]["limit"]
+    assert_equal 0, body["pagination"]["offset"]
+  end
+
+  test "create without an endpoint param returns a JSON error, not an HTML 500" do
+    post "/angarium/endpoints", headers: auth(@owner), params: {}, as: :json
+    assert_response :bad_request
+    assert JSON.parse(response.body).key?("error")
+  end
+
   test "show finds within scope and 404s across scope" do
     get "/angarium/endpoints/#{@endpoint.id}", headers: auth(@owner)
     assert_response :ok

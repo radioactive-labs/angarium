@@ -15,6 +15,7 @@ module Angarium
       rescue_from ActiveRecord::RecordInvalid, with: :angarium_render_invalid
       rescue_from Angarium::Api::NotAuthorized, with: :angarium_render_forbidden
       rescue_from Angarium::Api::UnpermittedParameter, with: :angarium_render_unpermitted
+      rescue_from ActionController::ParameterMissing, with: :angarium_render_bad_request
 
       # Resolved current user (via config.current_user). Public so policies can
       # read it as `controller.angarium_current_user`.
@@ -52,9 +53,10 @@ module Angarium
         angarium_policy.scope(Angarium::Endpoint.all)
       end
 
-      # A delivery whose endpoint is within the caller's scope, or 404.
+      # A delivery whose endpoint is within the caller's scope, or 404. Eager-load
+      # :event since delivery_json serializes event.name (avoids a follow-up query).
       def scoped_delivery(id)
-        Angarium::Delivery.where(endpoint_id: endpoint_scope.select(:id)).find(id)
+        Angarium::Delivery.includes(:event).where(endpoint_id: endpoint_scope.select(:id)).find(id)
       end
 
       # Guard the current action with the policy's `<action>?` predicate.
@@ -66,13 +68,22 @@ module Angarium
       # and advertises the window with a `pagination` object so clients can page
       # (there's more when offset + count < total).
       def render_collection(key, relation, &serializer)
-        limit = params.fetch(:limit, 50).to_i.clamp(1, 200)
-        offset = [params.fetch(:offset, 0).to_i, 0].max
+        limit = pagination_param(:limit, 50).clamp(1, 200)
+        offset = [pagination_param(:offset, 0), 0].max
         records = relation.limit(limit).offset(offset).to_a
         render json: {
           key => records.map(&serializer),
           :pagination => {limit: limit, offset: offset, count: records.size, total: relation.count}
         }
+      end
+
+      # Coerce a pagination query param to an integer, ignoring non-scalar input.
+      # A hostile `?limit[]=1` makes params[:limit] an Array/Parameters, which
+      # has no #to_i and would otherwise raise an uncaught 500; fall back to the
+      # default for anything that isn't a plain string.
+      def pagination_param(key, default)
+        raw = params[key]
+        raw.is_a?(String) ? raw.to_i : default
       end
 
       def render_error(status, message, **extra)
@@ -82,6 +93,7 @@ module Angarium
       def angarium_render_unauthorized = render_error(:unauthorized, "authentication required")
       def angarium_render_forbidden = render_error(:forbidden, "not authorized")
       def angarium_render_not_found = render_error(:not_found, "not found")
+      def angarium_render_bad_request(error) = render_error(:bad_request, "bad request", details: [error.message])
 
       def angarium_render_invalid(error)
         render_error(:unprocessable_entity, "validation failed", details: error.record.errors.full_messages)
