@@ -20,6 +20,7 @@
 RELEASE_CLIFF_CONFIG = ".cliff.toml"
 RELEASE_VERSION_FILE = "lib/angarium/version.rb"
 RELEASE_GEM_NAME = "angarium"
+RELEASE_SECURITY_FILE = "SECURITY.md"
 
 namespace :release do
   # --- helpers --------------------------------------------------------------
@@ -75,6 +76,21 @@ namespace :release do
     content = File.read(RELEASE_VERSION_FILE)
     File.write(RELEASE_VERSION_FILE, content.gsub(/VERSION = "[\d.]+"/, %(VERSION = "#{version}")))
     puts "✓ #{RELEASE_VERSION_FILE}"
+
+    # Bump the supported-version series in SECURITY.md (e.g. 0.1.x), so the
+    # policy always names the current release series. Skipped if the file or the
+    # expected X.Y.x marker is missing — a release must never fail over this.
+    if File.exist?(RELEASE_SECURITY_FILE)
+      series = "#{version.split(".").first(2).join(".")}.x"
+      security = File.read(RELEASE_SECURITY_FILE)
+      updated = security.gsub(/\b\d+\.\d+\.x\b/, series)
+      if updated == security
+        puts "• #{RELEASE_SECURITY_FILE} — no X.Y.x marker found, skipping"
+      else
+        File.write(RELEASE_SECURITY_FILE, updated)
+        puts "✓ #{RELEASE_SECURITY_FILE}"
+      end
+    end
 
     # Changelog: same config CI uses for release notes, so they agree.
     abort "git-cliff not found. Install with: brew install git-cliff" unless git_cliff?

@@ -15,10 +15,14 @@ list the versions that receive security updates.
 Please report security vulnerabilities **privately**. Do **not** open a public
 issue, pull request, or discussion for a suspected vulnerability.
 
-Use GitHub's private vulnerability reporting for the
-[`radioactive-labs/angarium`](https://github.com/radioactive-labs/angarium)
-repository: go to the **Security** tab and choose **Report a vulnerability**
-(this opens a private draft advisory visible only to the maintainers).
+Use one of the following private channels:
+
+- **Preferred:** GitHub's private vulnerability reporting for the
+  [`radioactive-labs/angarium`](https://github.com/radioactive-labs/angarium)
+  repository — go to the **Security** tab and choose **Report a vulnerability**
+  (this opens a private draft advisory visible only to the maintainers).
+- **Email:** [sfroelich01@gmail.com](mailto:sfroelich01@gmail.com) with the
+  subject line `[SECURITY] Angarium`.
 
 We aim to acknowledge new reports within a few business days, and we'll keep you
 informed as we investigate and prepare a fix. Please give us a reasonable window
