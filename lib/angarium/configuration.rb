@@ -5,7 +5,8 @@ module Angarium
       :primary_key_type, :database, :connects_to, :max_response_body_bytes,
       :auto_disable_endpoint_after, :respect_retry_after,
       :max_retry_after, :retry_jitter, :signing_secret_grace_period,
-      :delivery_attempt_retention, :delivering_timeout,
+      :delivery_attempt_retention, :delivering_timeout, :dns_timeout,
+      :resolve_dns_with_hosts_file, :max_url_length, :max_subscribed_events,
       :on_delivery_exhausted, :on_endpoint_deactivated, :on_endpoint_verified,
       :parent_controller, :current_user, :policy_class
 
@@ -34,6 +35,10 @@ module Angarium
       # Takes precedence over @database for the connection.
       @connects_to = nil
       @max_response_body_bytes = 65_536
+      # Disable an endpoint after this many consecutive *failed deliveries* (a
+      # delivery that exhausts its whole retry schedule, or is blocked by the SSRF
+      # guard) — NOT individual failed HTTP attempts. A single delivery that
+      # retries and eventually gives up counts as one. nil disables auto-disable.
       @auto_disable_endpoint_after = nil
       @respect_retry_after = true
       @max_retry_after = 3600
@@ -41,6 +46,20 @@ module Angarium
       @signing_secret_grace_period = 24.hours
       @delivery_attempt_retention = nil
       @delivering_timeout = 15.minutes
+      # Per-try timeout(s), in seconds, for resolving an endpoint host before
+      # delivery. Bounds how long a hostile or misconfigured slow-resolving host
+      # can stall a delivery worker (Resolv::DNS retries across the array). Set to
+      # nil to use the resolver's own defaults.
+      @dns_timeout = [1, 3]
+      # Whether host resolution also consults the system hosts file (/etc/hosts),
+      # not just DNS. Default true, so an internal endpoint pinned via /etc/hosts
+      # resolves as expected. Set false to harden a deployment to DNS-only.
+      @resolve_dns_with_hosts_file = true
+      # Max length of an endpoint URL and the cap on how many event patterns an
+      # endpoint may subscribe to (each pattern is replayed by EventMatcher on
+      # every dispatch). Both bound user-supplied input.
+      @max_url_length = 2048
+      @max_subscribed_events = 100
       @on_delivery_exhausted = nil # ->(delivery) { ... }
       @on_endpoint_deactivated = nil # ->(endpoint, reason) { ... } reason: :consecutive_failures | :gone
       @on_endpoint_verified = nil # ->(endpoint) { ... } fired when an unverified endpoint is verified

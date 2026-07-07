@@ -14,6 +14,10 @@ class Angarium::ConfigurationTest < ActiveSupport::TestCase
     assert_match(/Angarium/, config.user_agent)
     assert_nil config.database, "defaults to the app's primary connection"
     assert_nil config.connects_to, "defaults to the app's primary connection"
+    assert_equal [1, 3], config.dns_timeout
+    assert_equal true, config.resolve_dns_with_hosts_file
+    assert_equal 2048, config.max_url_length
+    assert_equal 100, config.max_subscribed_events
   end
 
   test "connects_to is settable for multi-database setups" do
