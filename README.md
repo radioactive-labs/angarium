@@ -1,5 +1,6 @@
 # Angarium
 
+[![Gem Version](https://img.shields.io/gem/v/angarium)](https://rubygems.org/gems/angarium)
 [![CI](https://github.com/radioactive-labs/angarium/actions/workflows/ci.yml/badge.svg)](https://github.com/radioactive-labs/angarium/actions/workflows/ci.yml)
 [![Standard Webhooks](https://img.shields.io/badge/Standard%20Webhooks-compliant-3068b7)](https://www.standardwebhooks.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](MIT-LICENSE)
