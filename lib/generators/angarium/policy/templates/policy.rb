@@ -23,6 +23,10 @@ class <%= class_name %> < Angarium::Api::Policy
   # def permit_allow_private_network? = current_user.admin?
   # def permit_allowed_networks? = true
 
+  # Include owner_type/owner_id in serialized endpoints (default off). Turn on
+  # for an admin/multi-tenant console that lists endpoints across owners.
+  # def expose_owner? = current_user.admin?
+
   # Per-action permissions. rotate_secret?/pause?/enable?/ping?/redeliver? all
   # default to update?.
   # def index?   = true

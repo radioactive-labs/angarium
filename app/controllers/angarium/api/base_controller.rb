@@ -99,6 +99,12 @@ module Angarium
           created_at: endpoint.created_at.iso8601,
           updated_at: endpoint.updated_at.iso8601
         }
+        if angarium_policy.expose_owner?
+          # Raw columns off the row (no owner fetch, so no cross-database hit);
+          # the caller reassembles the owner via its own type/id convention.
+          json[:owner_type] = endpoint.owner_type
+          json[:owner_id] = endpoint.owner_id
+        end
         json[:signing_secret] = endpoint.signing_secret if include_secret
         json
       end

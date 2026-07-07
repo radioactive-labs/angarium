@@ -443,6 +443,7 @@ methods:
 | `create_unverified?` | `false` | Whether endpoints created through the API start `unverified` (no deliveries until a successful ping verifies them) instead of live. |
 | `permit_allow_private_network?` | `false` | Whether `allow_private_network` (relax the private-IP block) is API-writable. Dangerous; trusted operators only. |
 | `permit_allowed_networks?` | `false` | Whether `allowed_networks` (a restrictive CIDR allowlist) is API-writable. |
+| `expose_owner?` | `false` | Whether serialized endpoints include `owner_type`/`owner_id`. Off by default (the owner is the tenancy boundary, resolved server-side). Turn on for a cross-owner console that must tell endpoints apart. |
 | `index?` `show?` `create?` `update?` `destroy?` | `true` | Whether each action is allowed. |
 | `rotate_secret?` `pause?` `enable?` `verify?` `ping?` `redeliver?` | `update?` | Member actions; default to the `update?` capability. |
 
@@ -454,6 +455,11 @@ your own endpoints). A denied action returns `403`; anything outside `scope` is 
 class WebhookEndpointPolicy < Angarium::Api::Policy
   # Multi-tenant visibility: compose on top of the relation you're given.
   def scope(relation) = relation.where(owner_id: current_user.account.owner_ids)
+
+  # A console spanning owners needs owner_type/owner_id on each endpoint to tell
+  # them apart. Pair this with a scope (above) that actually spans owners —
+  # expose_owner? only affects serialization, not what the caller can see.
+  def expose_owner? = current_user.admin?
 
   # Admins may create for any owner in their account (via an owner_id param);
   # everyone else creates for themselves.
@@ -514,6 +520,9 @@ included (see the note below):
 
 - **Secrets are never echoed.** `signing_secret` is returned only by `create` and
   `rotate_secret`; `custom_headers` (which may hold a credential) is write-only.
+- **Owner is opt-in.** The endpoint object omits `owner_type`/`owner_id` unless the
+  policy's `expose_owner?` returns true; `owner_id` is a string (a polymorphic
+  owner may have any primary-key type).
 - **Pagination.** List endpoints take `?limit=` (default 50, max 200) and
   `?offset=`, and each list response carries a `pagination` object (`limit`,
   `offset`, `count` in this page, `total` overall); there are more when

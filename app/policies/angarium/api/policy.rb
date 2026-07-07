@@ -61,6 +61,16 @@ module Angarium
         false
       end
 
+      # Should serialized endpoints include their owner (owner_type/owner_id)?
+      # Default: no. The owner is the tenancy boundary, resolved server-side, so
+      # the single-owner default has no reason to echo it back. Override for an
+      # admin/multi-tenant console that lists endpoints across owners and needs
+      # to tell them apart. The raw columns are exposed (already loaded on the
+      # row), not the owner record, so this adds no per-row database fetch.
+      def expose_owner?
+        false
+      end
+
       def index? = true
       def show? = true
       def create? = true

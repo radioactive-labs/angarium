@@ -20,6 +20,11 @@ class VerifyFirstPolicy < Angarium::Api::Policy
   def create_unverified? = true
 end
 
+# Exposes the owner columns so a cross-owner console can tell endpoints apart.
+class OwnerExposingPolicy < Angarium::Api::Policy
+  def expose_owner? = true
+end
+
 class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
   setup do
     @owner = Owner.create!(name: "Acme")
@@ -45,6 +50,26 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     assert_equal [@endpoint.id], endpoints.map { |e| e["id"] }
     refute endpoints.first.key?("signing_secret")
     refute endpoints.first.key?("custom_headers")
+  end
+
+  test "owner is not serialized by default" do
+    get "/angarium/endpoints/#{@endpoint.id}", headers: auth(@owner)
+    assert_response :ok
+    endpoint = JSON.parse(response.body)["endpoint"]
+    refute endpoint.key?("owner_type")
+    refute endpoint.key?("owner_id")
+  end
+
+  test "a policy can expose the owner columns" do
+    Angarium.config.stub(:policy_class, "OwnerExposingPolicy") do
+      get "/angarium/endpoints/#{@endpoint.id}", headers: auth(@owner)
+    end
+    assert_response :ok
+    endpoint = JSON.parse(response.body)["endpoint"]
+    assert_equal @owner.class.name, endpoint["owner_type"]
+    # owner_id is a string column (polymorphic across any PK type), so it
+    # serializes as a string regardless of the host's primary-key type.
+    assert_equal @owner.id.to_s, endpoint["owner_id"]
   end
 
   test "index pages with limit/offset and reports the total" do
