@@ -591,7 +591,12 @@ at delivery time:
 - **`config.block_private_ips`** (default `true`) blocks delivery to
   private, loopback, and link-local addresses (e.g. `127.0.0.1`, `10.0.0.0/8`,
   `169.254.169.254`), including IPv4-mapped IPv6 forms (e.g. `::ffff:127.0.0.1`)
-  and the unspecified address (`0.0.0.0` / `::`).
+  and the unspecified address (`0.0.0.0` / `::`). It also blocks IANA special-use
+  ranges that aren't flagged as "private" but are still unsafe targets —
+  `0.0.0.0/8` (routes to localhost on Linux), CGNAT (`100.64.0.0/10`), reserved
+  space (`240.0.0.0/4`), and the NAT64 prefix (`64:ff9b::/96`, which can embed the
+  metadata IP). Resolution is re-checked at delivery time and the connection is
+  pinned to the validated IP, so DNS rebinding can't slip past.
 - **`endpoint.allow_private_network`** (default `false`) is the per-endpoint opt-in
   required to deliver to a private address. An allowlist entry alone does **not**
   unlock a private address.
@@ -696,7 +701,11 @@ which documents every option inline. The delivery and retry settings:
 | `max_retry_after` | `3600` | Cap (seconds) on a honored `Retry-After`; `nil` is uncapped. |
 | `auto_disable_endpoint_after` | `nil` | Deactivate an endpoint after N consecutive failures; `nil` never does. |
 | `signing_secret_grace_period` | `24.hours` | How long a rotated endpoint's previous secret stays valid. |
-| `block_private_ips` | `true` | Reject endpoint URLs resolving to private/loopback addresses (SSRF). |
+| `block_private_ips` | `true` | Reject endpoint URLs resolving to private/loopback/special-use addresses (SSRF). |
+| `dns_timeout` | `[1, 3]` | Per-try timeout(s) in seconds for resolving an endpoint host; `nil` uses the resolver default. |
+| `resolve_dns_with_hosts_file` | `true` | Also resolve endpoint hosts via the system hosts file (e.g. `/etc/hosts`), not DNS only. Set `false` to harden to DNS-only. |
+| `max_url_length` | `2048` | Maximum length of an endpoint URL. |
+| `max_subscribed_events` | `100` | Maximum number of event patterns an endpoint may subscribe to. |
 | `max_response_body_bytes` | `65_536` | Truncate the stored response body; `nil` stores it whole. |
 | `delivery_attempt_retention` | `nil` | Age past which `angarium:prune` deletes attempts; `nil` keeps all. |
 | `delivering_timeout` | `15.minutes` | Age after which `angarium:reap` requeues a stuck `delivering` delivery. |
