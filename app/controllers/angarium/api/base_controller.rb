@@ -31,8 +31,19 @@ module Angarium
       end
 
       # The policy for this request (config.policy_class), holding scope,
-      # create-owner, and per-action permissions.
+      # create-owner, and per-action permissions. The record-less policy is
+      # memoized: scope/owner/expose_owner? and friends are request-global and
+      # get called repeatedly (expose_owner? runs once per serialized row), so a
+      # list response would otherwise allocate a fresh policy per endpoint. A
+      # record-bound policy (member authorize!) still constructs fresh, since it
+      # varies by record.
       def angarium_policy(record = nil)
+        return build_angarium_policy(record) if record
+
+        @angarium_policy ||= build_angarium_policy
+      end
+
+      def build_angarium_policy(record = nil)
         Angarium.config.policy_class.to_s.constantize.new(self, record)
       end
 
