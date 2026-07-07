@@ -5,6 +5,34 @@ All notable changes to this project are documented here. The format is based on
 follow [Semantic Versioning](https://semver.org). While on 0.x, a minor release
 may include breaking changes; patch releases stay backward compatible.
 
+## [0.2.0] - 2026-07-07
+
+### Bug Fixes
+
+- Harden delivery concurrency and endpoint validation
+- Block special-use ranges and bound DNS resolution
+- Robust pagination, JSON error contract, event preload
+
+### Documentation
+
+- Add email reporting channel and auto-bump SECURITY.md version
+- Document new config options and SSRF special-use hardening
+
+### Features
+
+- Expose endpoint owner in the API behind a policy gate
+- Add dns_timeout, hosts-file toggle, and input limits
+- Add hot-path indexes, persisted forced flag, text url column
+
+### Performance
+
+- Memoize the record-less API policy per request
+- Load only the columns subscription matching needs
+
+### Refactoring
+
+- Rename ping event and message to plain "ping"
+
 ## [0.1.0] - 2026-07-07
 
 ### Bug Fixes
@@ -26,6 +54,7 @@ may include breaking changes; patch releases stay backward compatible.
 - Close the last README review nits
 - Include unverified in the ping status lists
 - Document ActiveSupport::Notifications instrumentation
+- Add RubyGems version badge to README
 
 ### Features
 
