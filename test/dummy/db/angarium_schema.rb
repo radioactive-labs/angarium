@@ -16,12 +16,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_035322) do
     t.datetime "created_at", null: false
     t.bigint "endpoint_id", null: false
     t.bigint "event_id", null: false
+    t.boolean "forced", default: false, null: false
     t.datetime "last_attempt_at"
     t.datetime "next_attempt_at"
     t.string "state", default: "pending", null: false
     t.datetime "updated_at", null: false
-    t.index ["endpoint_id"], name: "index_angarium_deliveries_on_endpoint_id"
+    t.index ["endpoint_id", "created_at"], name: "idx_angarium_deliveries_on_endpoint_created_at"
     t.index ["event_id"], name: "index_angarium_deliveries_on_event_id"
+    t.index ["state", "last_attempt_at"], name: "idx_angarium_deliveries_on_state_last_attempt"
   end
 
   create_table "angarium_delivery_attempts", force: :cascade do |t|
@@ -32,7 +34,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_035322) do
     t.text "response_body"
     t.integer "response_code"
     t.datetime "updated_at", null: false
-    t.index ["delivery_id"], name: "index_angarium_delivery_attempts_on_delivery_id"
+    t.index ["created_at"], name: "idx_angarium_attempts_on_created_at"
+    t.index ["delivery_id", "created_at"], name: "idx_angarium_attempts_on_delivery_created_at"
   end
 
   create_table "angarium_endpoints", force: :cascade do |t|
@@ -51,8 +54,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_035322) do
     t.datetime "status_changed_at"
     t.json "subscribed_events", default: [], null: false
     t.datetime "updated_at", null: false
-    t.string "url", null: false
-    t.index ["owner_type", "owner_id"], name: "index_angarium_endpoints_on_owner"
+    t.text "url", null: false
+    t.index ["owner_type", "owner_id", "created_at"], name: "idx_angarium_endpoints_on_owner_created_at"
   end
 
   create_table "angarium_events", force: :cascade do |t|
