@@ -139,14 +139,14 @@ module Angarium
       transition_status!(:enabled, from: :unverified) { Angarium.notify(:on_endpoint_verified, self) }
     end
 
-    # Deliver a synthetic `ping` event to this endpoint, bypassing
-    # subscription matching (a ping is always sent). By default a ping also
-    # ignores the endpoint's status, so you can test an endpoint that is paused,
-    # disabled, or not yet enabled; pass `force: false` to respect the status
-    # guard instead. Returns the created Angarium::Delivery, whose
-    # after_create_commit enqueues the DeliverJob; reload it to inspect the outcome.
+    # Deliver a synthetic ping event (name from config.ping_event_name, default
+    # "ping") to this endpoint, bypassing subscription matching (a ping is always
+    # sent). By default a ping also ignores the endpoint's status, so you can test
+    # an endpoint that is paused, disabled, or not yet enabled; pass `force: false`
+    # to respect the status guard instead. Returns the created Angarium::Delivery,
+    # whose after_create_commit enqueues the DeliverJob; reload it to inspect the outcome.
     def ping!(payload = {message: "ping"}, force: true)
-      event = Angarium::Event.create!(name: "ping", payload: payload)
+      event = Angarium::Event.create!(name: Angarium.config.ping_event_name, payload: payload)
       deliveries.create!(event: event, forced: force)
     end
 

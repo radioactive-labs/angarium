@@ -7,6 +7,7 @@ module Angarium
       :max_retry_after, :retry_jitter, :signing_secret_grace_period,
       :delivery_attempt_retention, :delivering_timeout, :dns_timeout,
       :resolve_dns_with_hosts_file, :max_url_length, :max_subscribed_events,
+      :ping_event_name,
       :on_delivery_exhausted, :on_endpoint_deactivated, :on_endpoint_verified,
       :parent_controller, :current_user, :policy_class
 
@@ -60,6 +61,10 @@ module Angarium
       # every dispatch). Both bound user-supplied input.
       @max_url_length = 2048
       @max_subscribed_events = 100
+      # Event name of the synthetic event emitted by Endpoint#ping!. Configurable
+      # so it won't collide with an application that already uses "ping" for its
+      # own events (and so pings can be routed/filtered distinctly).
+      @ping_event_name = "ping"
       @on_delivery_exhausted = nil # ->(delivery) { ... }
       @on_endpoint_deactivated = nil # ->(endpoint, reason) { ... } reason: :consecutive_failures | :gone
       @on_endpoint_verified = nil # ->(endpoint) { ... } fired when an unverified endpoint is verified

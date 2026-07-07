@@ -458,6 +458,12 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     assert_equal @endpoint.url, fake.last.url
   end
 
+  test "ping! uses the configured ping event name" do
+    Angarium.config.stub(:ping_event_name, "angarium.healthcheck") do
+      assert_equal "angarium.healthcheck", @endpoint.ping!.event.name
+    end
+  end
+
   # --- Dual-secret rotation ---------------------------------------------------
 
   test "within the grace window a delivery verifies with both old and new secrets" do

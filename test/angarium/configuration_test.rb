@@ -18,6 +18,7 @@ class Angarium::ConfigurationTest < ActiveSupport::TestCase
     assert_equal true, config.resolve_dns_with_hosts_file
     assert_equal 2048, config.max_url_length
     assert_equal 100, config.max_subscribed_events
+    assert_equal "ping", config.ping_event_name
   end
 
   test "connects_to is settable for multi-database setups" do

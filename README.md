@@ -351,9 +351,10 @@ redelivery is at-least-once-safe either way. Set it to `nil` to disable reaping.
 
 ### Pinging an endpoint
 
-Verify an endpoint end-to-end by delivering a synthetic `ping` event
-(subscription matching is bypassed, so a ping is always sent). Returns the
-`Angarium::Delivery`, so you can reload it to inspect the outcome:
+Verify an endpoint end-to-end by delivering a synthetic `ping` event (the name
+is `config.ping_event_name`, default `"ping"` — change it if your app already
+uses `"ping"`). Subscription matching is bypassed, so a ping is always sent.
+Returns the `Angarium::Delivery`, so you can reload it to inspect the outcome:
 
 ```ruby
 delivery = endpoint.ping!
@@ -706,6 +707,7 @@ which documents every option inline. The delivery and retry settings:
 | `resolve_dns_with_hosts_file` | `true` | Also resolve endpoint hosts via the system hosts file (e.g. `/etc/hosts`), not DNS only. Set `false` to harden to DNS-only. |
 | `max_url_length` | `2048` | Maximum length of an endpoint URL. |
 | `max_subscribed_events` | `100` | Maximum number of event patterns an endpoint may subscribe to. |
+| `ping_event_name` | `"ping"` | Event name for the synthetic event `endpoint.ping!` emits; change it to avoid colliding with your own events. |
 | `max_response_body_bytes` | `65_536` | Truncate the stored response body; `nil` stores it whole. |
 | `delivery_attempt_retention` | `nil` | Age past which `angarium:prune` deletes attempts; `nil` keeps all. |
 | `delivering_timeout` | `15.minutes` | Age after which `angarium:reap` requeues a stuck `delivering` delivery. |
