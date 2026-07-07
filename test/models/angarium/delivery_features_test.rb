@@ -322,6 +322,59 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
     assert delivery.reload.delivering?
   end
 
+  test "reap_stalled does not resurrect or re-enqueue a delivery that leaves delivering mid-reap" do
+    d1 = create_delivery
+    d2 = create_delivery
+    [d1, d2].each { |d| d.update_columns(state: "delivering", last_attempt_at: 20.minutes.ago) }
+
+    # Simulate the classic TOCTOU: as the reaper requeues the first stalled
+    # delivery, the other one's in-flight worker completes it. A reaper that
+    # resets by id alone (not scoped to state) would drag the just-succeeded row
+    # back to pending and enqueue a duplicate job.
+    enqueued = []
+    Angarium::DeliverJob.stub(:perform_later, ->(id) {
+      enqueued << id
+      others = [d1.id, d2.id] - [id]
+      Angarium::Delivery.where(id: others, state: "delivering").update_all(state: "succeeded", next_attempt_at: nil)
+    }) do
+      Angarium::Delivery.reap_stalled(older_than: 15.minutes)
+    end
+
+    assert_equal 1, enqueued.size, "only the still-delivering delivery should be requeued"
+    succeeded, requeued = [d1, d2].map(&:reload).partition(&:succeeded?)
+    assert_equal 1, succeeded.size, "the delivery that completed mid-reap must stay succeeded"
+    assert requeued.sole.pending?, "the genuinely stalled delivery is reset to pending"
+  end
+
+  test "a reaped forced delivery still bypasses the endpoint status guard on re-run" do
+    @endpoint.update!(status: :disabled)
+    delivery = @endpoint.deliveries.create!(event: @event, forced: true)
+    clear_enqueued_jobs # drop the after_create_commit job; we strand and reap manually
+    delivery.update_columns(state: "delivering", last_attempt_at: 20.minutes.ago)
+
+    assert_equal 1, Angarium::Delivery.reap_stalled(older_than: 15.minutes)
+    assert delivery.reload.pending?
+
+    fake = succeeding_client
+    Angarium::Client.stub(:new, fake) { perform_enqueued_jobs }
+
+    assert fake.requested?, "a reaped forced delivery should still reach a disabled endpoint"
+    assert delivery.reload.succeeded?
+  end
+
+  test "a forced delivery drops force once a recorded failure schedules a retry" do
+    @endpoint.update!(status: :disabled)
+    delivery = @endpoint.deliveries.create!(event: @event, forced: true)
+
+    # First (forced) attempt bypasses the guard and records a 500 -> schedules a retry.
+    Angarium.config.stub(:retry_schedule, [60]) do
+      delivery.deliver!(client: failing_client)
+    end
+
+    assert delivery.reload.pending?
+    refute delivery.forced?, "the scheduled retry must follow normal status rules"
+  end
+
   # --- Status-code handling & callbacks ---------------------------------------
 
   def gone_client

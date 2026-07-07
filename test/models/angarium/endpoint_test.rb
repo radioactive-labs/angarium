@@ -177,6 +177,52 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     assert build(custom_headers: {"Authorization" => "Bearer x"}).valid?
   end
 
+  test "rejects custom_headers whose value smuggles a CRLF (header injection)" do
+    endpoint = build(custom_headers: {"X-Trace" => "ok\r\nwebhook-signature: v1,forged"})
+    refute endpoint.valid?
+    assert_includes endpoint.errors[:custom_headers].join, "control characters"
+  end
+
+  test "rejects custom_headers whose key contains a control character" do
+    endpoint = build(custom_headers: {"X-Bad\nInjected" => "value"})
+    refute endpoint.valid?
+    assert_includes endpoint.errors[:custom_headers].join, "control characters"
+  end
+
+  test "caps the name length" do
+    assert build(name: "a" * 255).valid?
+    refute build(name: "a" * 256).valid?
+  end
+
+  test "caps the url length" do
+    refute build(url: "https://example.test/#{"a" * 2048}").valid?
+  end
+
+  test "bounds the subscribed_events array" do
+    assert build(subscribed_events: Array.new(100) { |i| "e#{i}" }).valid?
+    refute build(subscribed_events: Array.new(101) { |i| "e#{i}" }).valid?
+  end
+
+  test "rejects an over-long or non-string subscribed_events pattern" do
+    refute build(subscribed_events: ["a" * 256]).valid?
+    refute build(subscribed_events: [123]).valid?
+    refute build(subscribed_events: [""]).valid?
+  end
+
+  test "the subscribed_events cap is configurable" do
+    Angarium.config.stub(:max_subscribed_events, 2) do
+      assert build(subscribed_events: ["a", "b"]).valid?
+      refute build(subscribed_events: ["a", "b", "c"]).valid?
+    end
+  end
+
+  test "the url length cap is configurable" do
+    Angarium.config.stub(:max_url_length, 40) do
+      assert build(url: "https://example.test/hook").valid?
+      refute build(url: "https://example.test/#{"a" * 40}").valid?
+    end
+  end
+
   test "rotate_secret! records the previous secret and rotation time" do
     endpoint = build.tap(&:save!)
     old = endpoint.signing_secret

@@ -39,11 +39,13 @@ module Angarium
 
     before_validation :ensure_signing_secret, on: :create
 
-    validates :name, presence: true
+    validates :name, presence: true, length: {maximum: 255}
     validates :url, presence: true
     validates :url, "angarium/endpoint_url": true, if: :verify_url_address?
+    validate :url_within_length_limit
     validate :allowed_networks_are_valid_cidrs
     validate :custom_headers_are_strings
+    validate :subscribed_events_are_bounded
 
     def self.generate_signing_secret
       "whsec_#{Base64.strict_encode64(SecureRandom.bytes(32))}"
@@ -120,8 +122,10 @@ module Angarium
     def enable!
       return false unless transition_status!(:enabled, consecutive_failures: 0)
       # Resume deliveries parked while this endpoint was paused (pending with no
-      # scheduled attempt). Dispatch creates none while paused, so this only
-      # re-enqueues the held ones.
+      # scheduled attempt). This predicate can also match a delivery that already
+      # has an in-flight job (a forced ping, a just-redelivered row), but a stray
+      # re-enqueue is harmless: the atomic pending->delivering claim in
+      # Delivery#deliver! guarantees only one worker ever sends a given delivery.
       deliveries.where(state: "pending", next_attempt_at: nil).find_each { |d| DeliverJob.perform_later(d.id) }
       true
     end
@@ -143,7 +147,7 @@ module Angarium
     # after_create_commit enqueues the DeliverJob; reload it to inspect the outcome.
     def ping!(payload = {message: "ping"}, force: true)
       event = Angarium::Event.create!(name: "ping", payload: payload)
-      deliveries.create!(event: event) { |d| d.force_send = force }
+      deliveries.create!(event: event, forced: force)
     end
 
     private
@@ -200,6 +204,31 @@ module Angarium
       end
     end
 
+    def url_within_length_limit
+      max = Angarium.config.max_url_length
+      return if url.blank? || max.nil? || url.length <= max
+
+      errors.add(:url, "is too long (maximum is #{max} characters)")
+    end
+
+    def subscribed_events_are_bounded
+      return if subscribed_events.blank?
+
+      unless subscribed_events.is_a?(Array)
+        errors.add(:subscribed_events, "must be an array of event patterns")
+        return
+      end
+
+      max = Angarium.config.max_subscribed_events
+      if max && subscribed_events.length > max
+        errors.add(:subscribed_events, "cannot have more than #{max} subscribed events")
+      end
+
+      unless subscribed_events.all? { |e| e.is_a?(String) && !e.empty? && e.length <= 255 }
+        errors.add(:subscribed_events, "must be non-empty strings of at most 255 characters")
+      end
+    end
+
     def custom_headers_are_strings
       return if custom_headers.blank?
 
@@ -211,6 +240,14 @@ module Angarium
 
       if custom_headers.keys.any? { |k| RESERVED_HEADERS.include?(k.downcase) }
         errors.add(:custom_headers, "cannot override reserved or transport headers (#{RESERVED_HEADERS.join(", ")})")
+      end
+
+      # Reject CR/LF/NUL in any key or value. The outbound HTTP client writes
+      # headers verbatim, so a CRLF in a value would inject an extra header line
+      # — smuggling e.g. a forged webhook-signature past the RESERVED_HEADERS
+      # denylist (which only guards whole keys). Fail closed instead.
+      if custom_headers.any? { |k, v| k.match?(/[\r\n\0]/) || v.match?(/[\r\n\0]/) }
+        errors.add(:custom_headers, "must not contain control characters (CR, LF, or NUL)")
       end
     end
   end

@@ -114,6 +114,25 @@ class Angarium::DeliverJobTest < ActiveSupport::TestCase
     assert delivery.reload.succeeded?
   end
 
+  test "deliver! does not send when the delivery was already claimed by another worker" do
+    delivery = Angarium::Delivery.create!(event: @event, endpoint: @endpoint)
+    # Another worker atomically claims the same delivery first (pending -> delivering).
+    Angarium::Delivery.where(id: delivery.id).update_all(state: "delivering", attempt_count: 1, last_attempt_at: Time.current)
+
+    fake = FakeAngariumClient.new(
+      Angarium::Client::Result.new(success: true, code: 200, body: "ok", duration: 0.0, headers: {})
+    )
+    # Our in-memory copy is stale (still pending); deliver! must lose the race and not POST.
+    result = nil
+    Angarium::AddressPolicy.stub(:resolve, [IPAddr.new("203.0.113.10")]) do
+      result = delivery.deliver!(client: fake)
+    end
+
+    assert_nil result, "a lost claim returns nil (no attempt made)"
+    assert_not fake.requested?, "must not deliver a row already claimed by another worker"
+    assert_equal 1, delivery.reload.attempt_count, "attempt_count is not double-incremented"
+  end
+
   test "fails closed (retryable) when the host cannot be resolved" do
     Angarium.config.stub(:retry_schedule, []) do
       stub = stub_request(:post, "https://nope.invalid/hook")

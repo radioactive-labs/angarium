@@ -13,12 +13,7 @@ module Angarium
     belongs_to :endpoint, class_name: "Angarium::Endpoint"
     has_many :delivery_attempts, class_name: "Angarium::DeliveryAttempt", dependent: :destroy
 
-    # Transient: set on a delivery built for a manual, forced send (e.g.
-    # endpoint.ping!(force: true)) so its first attempt bypasses the endpoint
-    # status guard. Not persisted; only the enqueued job carries it forward.
-    attr_accessor :force_send
-
-    after_create_commit { force_send ? DeliverJob.perform_later(id, true) : DeliverJob.perform_later(id) }
+    after_create_commit { DeliverJob.perform_later(id) }
 
     # Recover deliveries stranded in "delivering": a worker set the state to
     # "delivering" (in #deliver!) but died (crash, deploy, OOM) before
@@ -34,14 +29,30 @@ module Angarium
       ids = where(state: "delivering").where(last_attempt_at: ..older_than.ago).pluck(:id)
       return 0 if ids.empty?
 
-      where(id: ids).update_all(state: "pending", next_attempt_at: Time.current, updated_at: Time.current)
-      ids.each { |id| DeliverJob.perform_later(id) }
-      ids.size
+      # Reset each id with a state-scoped compare-and-swap, not a blanket
+      # `where(id: ids)`: a delivery can leave `delivering` (succeed, be marked
+      # gone, etc.) between the pluck above and this reset. Re-asserting
+      # `state: "delivering"` means we never drag a completed delivery back to
+      # pending, and — since only the reaper that actually flipped the row
+      # enqueues — two reapers racing the same snapshot can't double-enqueue.
+      requeued = 0
+      ids.each do |id|
+        changed = where(id: id, state: "delivering")
+          .update_all(state: "pending", next_attempt_at: Time.current, updated_at: Time.current)
+        next if changed.zero?
+
+        DeliverJob.perform_later(id)
+        requeued += 1
+      end
+      requeued
     end
 
     # Performs one attempt. Records a DeliveryAttempt, then transitions to
-    # succeeded, blocked (SSRF), schedules a retry, or exhausts. Returns the attempt.
-    def deliver!(client: Client.new, force: false)
+    # succeeded, blocked (SSRF), schedules a retry, or exhausts. Returns the
+    # attempt. `force` defaults to the persisted `forced` flag so a reaped or
+    # redelivered forced attempt keeps bypassing the guard; pass it explicitly
+    # only to override in tests.
+    def deliver!(client: Client.new, force: forced)
       payload = {delivery_id: id, endpoint_id: endpoint_id, event: event.name, force: force}
       ActiveSupport::Notifications.instrument("deliver.angarium", payload) do
         # An endpoint's status can change after a delivery is queued: auto-disable
@@ -62,7 +73,12 @@ module Angarium
           end
         end
 
-        update!(state: "delivering", attempt_count: attempt_count + 1, last_attempt_at: Time.current)
+        # Atomically claim this delivery (pending -> delivering) so only one
+        # worker ever attempts it. Without the compare-and-swap, two jobs for the
+        # same id (a reaper requeue racing a stale enqueue, an adapter retry, etc.)
+        # would both pass the guard above, both POST, and both read the same stale
+        # attempt_count. If the CAS changes no row, another worker owns it: bail.
+        return nil unless claim_for_attempt!
         payload[:attempt] = attempt_count
 
         # Re-resolve at delivery time (rather than trusting the save-time check)
@@ -144,14 +160,32 @@ module Angarium
 
     # Reset the retry cycle and re-enqueue immediately. Keeps prior
     # DeliveryAttempt history. `force: true` sends even if the endpoint is no
-    # longer enabled (for the re-enqueued attempt). Returns self.
+    # longer enabled (for the re-enqueued attempt); it is persisted so the reaper
+    # honors it too. Returns self.
     def redeliver!(force: false)
-      update!(state: "pending", next_attempt_at: nil, attempt_count: 0)
-      force ? DeliverJob.perform_later(id, true) : DeliverJob.perform_later(id)
+      update!(state: "pending", next_attempt_at: nil, attempt_count: 0, forced: force)
+      DeliverJob.perform_later(id)
       self
     end
 
     private
+
+    # Atomic pending -> delivering claim: the single writer gate for an attempt.
+    # Returns true if THIS caller won the row (and bumps attempt_count in the same
+    # statement so concurrent claimers can't both read a stale count), false if
+    # another worker already claimed it. Reload so in-memory state matches the
+    # CAS (the rest of #deliver! reads attempt_count, and later update!s need a
+    # clean dirty baseline to persist the delivering -> succeeded/pending move).
+    def claim_for_attempt!
+      now = Time.current
+      claimed = self.class.where(id: id, state: "pending").update_all(
+        ["state = 'delivering', attempt_count = attempt_count + 1, last_attempt_at = ?, updated_at = ?", now, now]
+      )
+      return false if claimed.zero?
+
+      reload
+      true
+    end
 
     # Endpoint was paused after this delivery was queued. Park it (no attempt
     # consumed, no failure recorded) by clearing the schedule and leaving it
@@ -203,7 +237,9 @@ module Angarium
         # misconfigured receiver could send a tiny Retry-After to defeat our
         # backoff and make us hammer it. Retry-After can delay, never expedite.
         wait = [wait, retry_after].max if retry_after
-        update!(state: "pending", next_attempt_at: Time.current + wait)
+        # Drop force: a recorded failure means the forced first attempt is spent,
+        # and per the deliver! contract any scheduled retry follows normal rules.
+        update!(state: "pending", next_attempt_at: Time.current + wait, forced: false)
         DeliverJob.set(wait: wait).perform_later(id)
       end
     end
