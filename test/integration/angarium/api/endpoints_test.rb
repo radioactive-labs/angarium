@@ -221,13 +221,13 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     assert @endpoint.reload.enabled?
   end
 
-  test "ping creates an angarium.ping delivery" do
+  test "ping creates a ping delivery" do
     assert_difference -> { @endpoint.deliveries.count }, 1 do
       post "/angarium/endpoints/#{@endpoint.id}/ping", headers: auth(@owner)
     end
     assert_response :accepted
     delivery = Angarium::Delivery.find(JSON.parse(response.body)["delivery"]["id"])
-    assert_equal "angarium.ping", delivery.event.name
+    assert_equal "ping", delivery.event.name
   end
 
   test "actions on another user's endpoint 404 (out of scope)" do

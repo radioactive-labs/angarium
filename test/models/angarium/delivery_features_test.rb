@@ -390,13 +390,13 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
 
   # --- Ping -------------------------------------------------------------------
 
-  test "ping! creates an angarium.ping delivery, enqueues, and delivers to the endpoint" do
+  test "ping! creates a ping delivery, enqueues, and delivers to the endpoint" do
     delivery = nil
     assert_enqueued_with(job: Angarium::DeliverJob) do
       delivery = @endpoint.ping!
     end
     assert_kind_of Angarium::Delivery, delivery
-    assert_equal "angarium.ping", delivery.event.name
+    assert_equal "ping", delivery.event.name
     assert_equal @endpoint, delivery.endpoint
 
     fake = succeeding_client

@@ -351,7 +351,7 @@ redelivery is at-least-once-safe either way. Set it to `nil` to disable reaping.
 
 ### Pinging an endpoint
 
-Verify an endpoint end-to-end by delivering a synthetic `angarium.ping` event
+Verify an endpoint end-to-end by delivering a synthetic `ping` event
 (subscription matching is bypassed, so a ping is always sent). Returns the
 `Angarium::Delivery`, so you can reload it to inspect the outcome:
 
