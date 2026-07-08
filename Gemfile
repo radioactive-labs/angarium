@@ -5,6 +5,20 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 gemspec
 
 gem "sqlite3"
+
+# Postgres and MySQL are each exercised by a dedicated CI job
+# (BUNDLE_WITH=postgresql / mysql); the suite otherwise runs on SQLite. Optional
+# so a plain `bundle install` for SQLite development needs neither libpq nor a
+# MySQL client. trilogy is a pure client (no libmysqlclient) and is Rails 8's
+# MySQL adapter.
+group :postgresql, optional: true do
+  gem "pg"
+end
+
+group :mysql, optional: true do
+  gem "trilogy"
+end
+
 gem "webmock"
 gem "minitest-mock"
 

@@ -12,9 +12,30 @@ development:
     database: db/angarium_development.sqlite3
     migrations_paths: db/angarium_migrate
 
+# Defaults to SQLite; the CI PostgreSQL/MySQL jobs set DB_ADAPTER to run the same
+# suite against a real server (native json + AR Encryption, non-UTF-8/NUL body
+# persistence, varchar length limits — none of which SQLite exercises faithfully).
 test:
+  <% if ENV["DB_ADAPTER"] == "postgresql" %>
+  adapter: postgresql
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  host: <%= ENV.fetch("PGHOST", "localhost") %>
+  port: <%= ENV.fetch("PGPORT", 5432) %>
+  username: <%= ENV.fetch("PGUSER", "postgres") %>
+  password: <%= ENV.fetch("PGPASSWORD", "postgres") %>
+  database: <%= ENV.fetch("PGDATABASE", "angarium_test") %>
+  <% elsif ENV["DB_ADAPTER"] == "mysql" %>
+  adapter: trilogy
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  host: <%= ENV.fetch("MYSQL_HOST", "127.0.0.1") %>
+  port: <%= ENV.fetch("MYSQL_PORT", 3306) %>
+  username: <%= ENV.fetch("MYSQL_USER", "root") %>
+  password: <%= ENV.fetch("MYSQL_PASSWORD", "root") %>
+  database: <%= ENV.fetch("MYSQL_DATABASE", "angarium_test") %>
+  <% else %>
   <<: *default
   database: db/test.sqlite3
+  <% end %>
 
 production:
   <<: *default

@@ -38,3 +38,81 @@ jobs:
           bundler-cache: true
       - name: Run tests
         run: bin/rails test
+
+  test-postgresql:
+    name: PostgreSQL (Ruby 3.3 / Rails 8.1)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: angarium_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Run the suite against Postgres to catch what SQLite papers over: encoding
+      # errors on non-UTF-8 response bodies, varchar length limits, and the
+      # AR Encryption + native json column interaction.
+      DB_ADAPTER: postgresql
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: angarium_test
+      BUNDLE_WITH: postgresql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: Load the test schema
+        run: bin/rails db:test:prepare
+      - name: Run tests
+        run: bin/rails test
+
+  test-mysql:
+    name: MySQL (Ruby 3.3 / Rails 8.1)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: angarium_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Run the suite against MySQL to catch what SQLite and Postgres don't:
+      # varchar(255) length limits (the `error` column) and the JSON-column
+      # constraints (no DB-level default, native json + AR Encryption). Uses the
+      # trilogy adapter, so no libmysqlclient is needed.
+      DB_ADAPTER: mysql
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      MYSQL_DATABASE: angarium_test
+      BUNDLE_WITH: mysql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: Load the test schema
+        run: bin/rails db:test:prepare
+      - name: Run tests
+        run: bin/rails test
