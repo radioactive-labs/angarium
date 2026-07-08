@@ -178,9 +178,18 @@ module Angarium
     # clean dirty baseline to persist the delivering -> succeeded/pending move).
     def claim_for_attempt!
       now = Time.current
-      claimed = self.class.where(id: id, state: "pending").update_all(
-        ["state = 'delivering', attempt_count = attempt_count + 1, last_attempt_at = ?, updated_at = ?", now, now]
-      )
+      # Also require the schedule to be due. Without this, a duplicate or stale
+      # enqueue (an at-least-once adapter re-running a job whose retry is scheduled
+      # for later) would claim and attempt EARLIER than next_attempt_at, defeating
+      # the backoff the Retry-After defenses exist to protect. New, held, and
+      # redelivered rows carry next_attempt_at: nil and so are always due; a
+      # scheduled retry becomes claimable only once its time arrives; the reaper
+      # stamps next_attempt_at = now on requeue, so a reaped row is due immediately.
+      claimed = self.class.where(id: id, state: "pending")
+        .where("next_attempt_at IS NULL OR next_attempt_at <= ?", now)
+        .update_all(
+          ["state = 'delivering', attempt_count = attempt_count + 1, last_attempt_at = ?, updated_at = ?", now, now]
+        )
       return false if claimed.zero?
 
       reload
