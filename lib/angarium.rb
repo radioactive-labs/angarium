@@ -38,7 +38,11 @@ module Angarium
 
       callback.call(*args)
     rescue => e
+      # A raising callback must never break the pipeline, but swallowing it with
+      # only a log hides a real bug from error tracking. Log and report it (handled,
+      # so delivery continues) so it surfaces where the operator will see it.
       Rails.logger.error { "[Angarium] #{callback_name} callback raised: #{e.class}: #{e.message}" }
+      Rails.error.report(e, handled: true, severity: :error, source: "angarium", context: {callback: callback_name})
     end
   end
 end
