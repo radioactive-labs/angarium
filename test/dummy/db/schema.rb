@@ -40,7 +40,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_04_000101) do
 
   create_table "angarium_endpoints", force: :cascade do |t|
     t.boolean "allow_private_network", default: false, null: false
-    t.json "allowed_networks", default: [], null: false
+    t.json "allowed_networks", null: false
     t.integer "consecutive_failures", default: 0, null: false
     t.datetime "created_at", null: false
     t.json "custom_headers"
@@ -52,7 +52,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_04_000101) do
     t.string "status", default: "enabled", null: false
     t.datetime "status_changed_at"
     t.text "signing_secret", null: false
-    t.json "subscribed_events", default: [], null: false
+    t.json "subscribed_events", null: false
     t.datetime "updated_at", null: false
     t.text "url", null: false
     t.index ["owner_type", "owner_id", "created_at"], name: "idx_angarium_endpoints_on_owner_created_at"
@@ -61,7 +61,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_04_000101) do
   create_table "angarium_events", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
-    t.json "payload", default: {}, null: false
+    t.json "payload", null: false
     t.datetime "updated_at", null: false
   end
 

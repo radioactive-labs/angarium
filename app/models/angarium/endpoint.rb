@@ -37,6 +37,12 @@ module Angarium
     # here keeps behavior correct on every supported Rails version.
     attribute :allow_private_network, :boolean, default: false
 
+    # Defaults at the model layer, not the column: both are JSON columns and MySQL
+    # forbids a DB default there. Procs yield a fresh object per record so the
+    # empty default is never shared/mutated across instances.
+    attribute :subscribed_events, default: -> { [] }
+    attribute :allowed_networks, default: -> { [] }
+
     before_validation :ensure_signing_secret, on: :create
 
     validates :name, presence: true, length: {maximum: 255}

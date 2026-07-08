@@ -12,6 +12,24 @@ class Angarium::EndpointTest < ActiveSupport::TestCase
     }.merge(attrs))
   end
 
+  test "subscribed_events and allowed_networks default to [] at the model layer" do
+    # The DB columns carry no default (MySQL forbids defaults on JSON columns),
+    # so the model must supply it or the null: false constraint fails on insert.
+    endpoint = Angarium::Endpoint.new(owner: @owner, name: "e", url: "https://203.0.113.10/h")
+    assert_equal [], endpoint.subscribed_events
+    assert_equal [], endpoint.allowed_networks
+    endpoint.save!
+    assert_equal [], endpoint.reload.subscribed_events
+    assert_equal [], endpoint.allowed_networks
+  end
+
+  test "each endpoint gets its own default array, not a shared one" do
+    a = Angarium::Endpoint.new
+    b = Angarium::Endpoint.new
+    a.allowed_networks << "10.0.0.0/8"
+    assert_equal [], b.allowed_networks, "the default must not be shared across records"
+  end
+
   test "generates a signing_secret on create when blank" do
     endpoint = build
     assert_nil endpoint.signing_secret
