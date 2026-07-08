@@ -107,8 +107,18 @@ module Angarium
         return unless body.key?(attr)
 
         current = (@endpoint || Angarium::Endpoint.new).public_send(attr)
-        submitted = body[attr]
-        submitted = Array(submitted).map(&:to_s) if attr == :allowed_networks
+        # Compare like-for-like against the typed attribute, so echoing the
+        # serialized endpoint back is a no-op regardless of wire representation:
+        # allowed_networks is an array of strings, while allow_private_network is a
+        # boolean a form/JSON client may send as "true"/"false"/"0"/"1". Without
+        # the cast, a stringly-typed "false" wouldn't == the boolean false and a
+        # semantic no-op would raise a spurious 422.
+        submitted =
+          if attr == :allowed_networks
+            Array(body[attr]).map(&:to_s)
+          else
+            ActiveModel::Type::Boolean.new.cast(body[attr])
+          end
 
         raise Angarium::Api::UnpermittedParameter, attr unless submitted == current
       end

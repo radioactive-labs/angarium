@@ -144,6 +144,24 @@ class Angarium::Api::EndpointsTest < ActionDispatch::IntegrationTest
     assert_equal "Renamed", @endpoint.reload.name
   end
 
+  test "echoing a forbidden boolean control as a string is a no-op, not a spurious 422" do
+    # A form-encoded or otherwise stringly-typed client sends "false", not a JSON
+    # boolean. Echoing the current value must still round-trip cleanly (the
+    # comparison casts to the typed attribute before comparing).
+    patch "/angarium/endpoints/#{@endpoint.id}",
+      params: {endpoint: {name: "Renamed", allow_private_network: "false"}}, headers: auth(@owner)
+    assert_response :ok
+    assert_equal "Renamed", @endpoint.reload.name
+    refute @endpoint.allow_private_network
+  end
+
+  test "actually changing a forbidden boolean control sent as a string is still a loud 422" do
+    patch "/angarium/endpoints/#{@endpoint.id}",
+      params: {endpoint: {allow_private_network: "true"}}, headers: auth(@owner)
+    assert_response :unprocessable_entity
+    refute @endpoint.reload.allow_private_network
+  end
+
   test "permit_allow_private_network? gates only the private-network relaxation" do
     Angarium.config.stub(:policy_class, "PrivateNetworkPolicy") do
       patch "/angarium/endpoints/#{@endpoint.id}",
