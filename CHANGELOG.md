@@ -5,6 +5,24 @@ All notable changes to this project are documented here. The format is based on
 follow [Semantic Versioning](https://semver.org). While on 0.x, a minor release
 may include breaking changes; patch releases stay backward compatible.
 
+## [0.3.0] - 2026-07-08
+
+### Bug Fixes
+
+- Persist delivery attempts without stranding on receiver text
+- Require the retry schedule to be due before claiming
+- Treat an echoed boolean network control as a no-op
+- Report swallowed callback errors to Rails.error
+- Set JSON column defaults at the model layer for MySQL
+
+### Features
+
+- Make the ping event name configurable
+
+### Ci
+
+- Run the suite against PostgreSQL and MySQL
+
 ## [0.2.0] - 2026-07-07
 
 ### Bug Fixes

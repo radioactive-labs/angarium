@@ -2,13 +2,13 @@
 
 ## Supported versions
 
-Angarium is pre-release. Security fixes are provided for the `0.2.x` series
+Angarium is pre-release. Security fixes are provided for the `0.3.x` series
 during this phase. Once a stable line is released, this policy will be updated to
 list the versions that receive security updates.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.2.x   | ✅        |
+| 0.3.x   | ✅        |
 
 ## Reporting a vulnerability
 
