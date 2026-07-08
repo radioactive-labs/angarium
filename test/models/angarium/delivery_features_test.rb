@@ -275,6 +275,32 @@ class Angarium::DeliveryFeaturesTest < ActiveSupport::TestCase
 
   # --- Redeliver --------------------------------------------------------------
 
+  test "a failed attempt insert records a generic error (no internal leak) and reports it" do
+    delivery = create_delivery
+    # Force the first insert to fail as the DB would on an unanticipated
+    # constraint; the fallback insert (second call) succeeds.
+    calls = 0
+    raiser = lambda do |*args, **kwargs|
+      calls += 1
+      raise ActiveRecord::StatementInvalid, "PG::CharacterNotInRepertoire: invalid byte" if calls == 1
+
+      Angarium::DeliveryAttempt.create!(delivery: delivery, **(args.first || kwargs))
+    end
+
+    reported = nil
+    Rails.error.stub(:report, ->(error, **) { reported = error }) do
+      delivery.delivery_attempts.stub(:create!, raiser) do
+        attempt = delivery.send(:record_attempt!, response_code: 200, error: "ignored", duration: 0.1)
+        # The webhook owner sees a generic marker, never the internal exception.
+        assert_equal "delivery attempt could not be recorded", attempt.error
+        refute_match(/StatementInvalid|PG::|CharacterNotInRepertoire/, attempt.error)
+      end
+    end
+
+    # The real cause is surfaced internally instead of being swallowed.
+    assert_instance_of ActiveRecord::StatementInvalid, reported
+  end
+
   test "redeliver! resets an exhausted delivery and re-enqueues" do
     delivery = create_delivery
     Angarium.config.stub(:retry_schedule, []) do

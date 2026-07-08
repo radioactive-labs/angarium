@@ -25,6 +25,10 @@ module Angarium
           headers: {})
       end
 
+      # Cap the response we hold in memory. The body is receiver-controlled and
+      # may not be persistable text (non-UTF-8 bytes, a NUL, or a multibyte char
+      # this byte cap splits); DeliveryAttempt#normalizes sanitizes it at
+      # persistence time, so this stays a pure transport concern.
       max = Angarium.config.max_response_body_bytes
       body = response.body.to_s
       body = body.byteslice(0, max) if max

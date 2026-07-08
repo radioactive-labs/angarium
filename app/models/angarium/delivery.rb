@@ -90,7 +90,7 @@ module Angarium
         if addresses.any? { |ip| !AddressPolicy.ip_allowed?(ip, endpoint) }
           payload[:outcome] = :blocked
           payload[:error] = "blocked: destination address not permitted"
-          attempt = delivery_attempts.create!(error: payload[:error])
+          attempt = record_attempt!(error: payload[:error])
           update!(state: "blocked", next_attempt_at: nil)
           endpoint.record_delivery_failure!
           return attempt
@@ -103,7 +103,7 @@ module Angarium
         if addresses.empty?
           payload[:outcome] = :unresolvable
           payload[:error] = "unresolvable host: #{destination_host}"
-          attempt = delivery_attempts.create!(error: payload[:error])
+          attempt = record_attempt!(error: payload[:error])
           handle_failure!
           return attempt
         end
@@ -129,7 +129,7 @@ module Angarium
           addresses: addresses.map(&:to_s)
         )
 
-        attempt = delivery_attempts.create!(
+        attempt = record_attempt!(
           response_code: result.code,
           response_body: result.body,
           error: result.error,
@@ -200,9 +200,34 @@ module Angarium
     # queued. Stop retrying and log why. Recover with redeliver! if the endpoint is
     # later re-enabled. Returns the logged attempt.
     def cancel!(reason:)
-      attempt = delivery_attempts.create!(error: "canceled: endpoint #{reason}")
+      attempt = record_attempt!(error: "canceled: endpoint #{reason}")
       update!(state: "canceled", next_attempt_at: nil)
       attempt
+    end
+
+    # Persist a DeliveryAttempt. A raise here lands after the row is already
+    # `delivering`, which would strand it for the reaper to redeliver forever (the
+    # exact failure F1 exists to prevent), so this must not raise on anything the
+    # receiver can influence. DeliveryAttempt#normalizes sanitizes the body and
+    # error at assignment (UTF-8 scrub, NUL strip, length cap), so the create!
+    # below should succeed; the rescue is a last-resort net for anything that slips
+    # through (a transient DB error, a MySQL limit we cannot reproduce on SQLite).
+    # We rescue broadly on purpose because any escape means a permanent loop.
+    def record_attempt!(attributes)
+      delivery_attempts.create!(attributes)
+    rescue => e
+      # The attempt's `error` is served to the webhook owner via the API, so we
+      # must not leak the internal exception there: store a generic marker for
+      # them, and surface the real cause internally so we can actually fix it.
+      # Reported to Rails.error because a delivery we can't record is a correctness
+      # problem, not a transient hiccup.
+      Rails.logger.error { "[Angarium] failed to persist delivery attempt for delivery ##{id}: #{e.class}: #{e.message}" }
+      Rails.error.report(e, handled: true, severity: :error, source: "angarium", context: {delivery_id: id})
+      delivery_attempts.create!(
+        response_code: attributes[:response_code],
+        duration: attributes[:duration],
+        error: "delivery attempt could not be recorded"
+      )
     end
 
     def succeed!
