@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Angarium — outbound webhooks for Rails</title>
+  <meta name="description" content="A Rails engine for outbound webhooks: HMAC signing, retries with backoff, zero-downtime secret rotation, SSRF protection, and a queryable log of every delivery attempt. Signs to the Standard Webhooks spec.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#fdfdfc" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#101317" media="(prefers-color-scheme: dark)">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Angarium — outbound webhooks for Rails">
+  <meta property="og:description" content="Everything your hand-rolled webhook job is missing: HMAC signing, retries with backoff, zero-downtime secret rotation, SSRF protection, and a log of every delivery attempt.">
+  <meta property="og:url" content="https://radioactive-labs.github.io/angarium/">
+  <script>
+    // Restore the saved theme before first paint, so there's no flash on refresh.
+    (function () {
+      try {
+        var t = localStorage.getItem("angarium-theme");
+        if (t) document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    :root {
+      --bg:    #fdfdfc;
+      --fg:    #1c1f24;
+      --soft:  #5b636e;
+      --link:  #245bab;
+      --code-bg: #f2f3f5;
+      --rule:  #e3e5e8;
+      --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #101317; --fg: #d9dde3; --soft: #8b93a0; --link: #7aa6e8;
+        --code-bg: #191d23; --rule: #262b32;
+      }
+    }
+    :root[data-theme="light"] { --bg:#fdfdfc; --fg:#1c1f24; --soft:#5b636e; --link:#245bab; --code-bg:#f2f3f5; --rule:#e3e5e8; }
+    :root[data-theme="dark"]  { --bg:#101317; --fg:#d9dde3; --soft:#8b93a0; --link:#7aa6e8; --code-bg:#191d23; --rule:#262b32; }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      font-size: 18px;
+      line-height: 1.62;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page { max-width: 48rem; margin: 0 auto; padding: 4.5rem 1.5rem 5rem; position: relative; }
+
+    .theme-toggle {
+      position: absolute; top: 1.5rem; right: 1.5rem;
+      font-family: var(--mono); font-size: 0.74rem; color: var(--soft);
+      background: none; border: 0; cursor: pointer; padding: 0.2rem;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    .theme-toggle:hover { color: var(--link); }
+
+    h1 {
+      font-family: var(--mono);
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin: 0 0 1.4rem;
+    }
+    h2 {
+      font-size: 1.02rem;
+      font-weight: 600;
+      margin: 2.8rem 0 0.9rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--rule);
+      color: var(--fg);
+    }
+    p { margin: 0 0 1.1rem; }
+    .lede { font-size: 1.12rem; }
+    .sub { color: var(--soft); }
+    a { color: var(--link); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+    a:hover { text-decoration-thickness: 2px; }
+
+    .badges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.2rem 0 1.8rem; align-items: center; }
+    .badges a { display: inline-flex; text-decoration: none; }
+    .badges img { height: 20px; display: block; }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.86em;
+      background: var(--code-bg);
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 0.95rem 1.1rem;
+      overflow-x: auto;
+      margin: 0 0 1.1rem;
+      line-height: 1.55;
+    }
+    pre code { background: none; padding: 0; font-size: 0.8rem; }
+    .cmt { color: var(--soft); }
+
+    ul { margin: 0 0 1.1rem; padding-left: 1.2rem; }
+    li { margin-bottom: 0.5rem; }
+    li b { font-weight: 600; }
+
+    .links { list-style: none; padding: 0; margin: 0.4rem 0 0; }
+    .links li { margin-bottom: 0.55rem; display: flex; gap: 0.7rem; }
+    .links .what { color: var(--soft); min-width: 6.5rem; display: inline-block; }
+
+    footer {
+      margin-top: 3.2rem; padding-top: 1.1rem; border-top: 1px solid var(--rule);
+      font-family: var(--mono); font-size: 0.78rem; color: var(--soft);
+    }
+    :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <button id="theme-toggle" class="theme-toggle" type="button">dark mode</button>
+    <h1>Angarium</h1>
+
+    <p class="lede">Everything your hand-rolled webhook job is missing: HMAC signing, retries with backoff, zero-downtime secret rotation, SSRF protection, and a queryable log of every delivery attempt.</p>
+
+    <p class="sub">Angarium is a Rails engine. It signs to the <a href="https://www.standardwebhooks.com">Standard Webhooks</a> spec, so your receivers verify with off-the-shelf libraries in any language and you never write verification docs of your own. Works with any ActiveJob backend on Rails 7.1+.</p>
+
+    <p class="badges">
+      <a href="https://rubygems.org/gems/angarium"><img alt="Gem Version" src="https://img.shields.io/gem/v/angarium"></a>
+      <a href="https://github.com/radioactive-labs/angarium/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/radioactive-labs/angarium/actions/workflows/ci.yml/badge.svg"></a>
+      <a href="https://www.standardwebhooks.com"><img alt="Standard Webhooks compliant" src="https://img.shields.io/badge/Standard%20Webhooks-compliant-3068b7"></a>
+      <a href="https://github.com/radioactive-labs/angarium/blob/main/MIT-LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg"></a>
+    </p>
+
+    <h2>Install</h2>
+    <pre><code><span class="cmt"># Gemfile</span>
+gem "angarium"</code></pre>
+    <pre><code>bundle install
+bin/rails g angarium:install
+bin/rails db:migrate</code></pre>
+
+    <h2>The 30-second tour</h2>
+    <p>Any model can own endpoints (an account, team, or user):</p>
+    <pre><code>class Account &lt; ApplicationRecord
+  has_many :webhook_endpoints, as: :owner, class_name: "Angarium::Endpoint"
+end
+
+<span class="cmt"># Register an endpoint; the signing secret is generated for you</span>
+account.webhook_endpoints.create!(
+  name: "Production",
+  url: "https://example.com/webhooks",
+  subscribed_events: ["invoice.*", "user.created"]
+)
+
+<span class="cmt"># Fan an event out to every subscribed endpoint</span>
+Angarium.dispatch("invoice.paid", { id: 123, total: 4200 }, owner: account)</code></pre>
+    <p class="sub">Angarium handles the rest: signing, retries with backoff, <code>Retry-After</code>, dedup-friendly delivery IDs, SSRF checks, and a full attempt log.</p>
+
+    <h2>What you get</h2>
+    <ul>
+      <li><b>Standard Webhooks signing.</b> HMAC-SHA256 over every request, verifiable with an off-the-shelf library. Conformance is enforced in CI.</li>
+      <li><b>Retries with backoff.</b> Twelve attempts over roughly ten days, with jitter, honoring <code>Retry-After</code> to delay but never to hammer.</li>
+      <li><b>Zero-downtime secret rotation.</b> Signs with both old and new during a grace window, so receivers roll over without a rejected delivery.</li>
+      <li><b>SSRF protection.</b> Blocks private ranges, pins the connection to the validated IP against DNS rebinding, and fails closed on unresolvable hosts.</li>
+      <li><b>A log of every attempt.</b> Response code, body, error, and duration are persisted. Nothing is silently dropped.</li>
+      <li><b>An optional JSON API.</b> Policy-gated endpoints for managing subscriptions and browsing deliveries, using your app's own auth.</li>
+    </ul>
+
+    <h2>Documentation</h2>
+    <ul class="links">
+      <li><span class="what">Guide &amp; API</span><a href="https://github.com/radioactive-labs/angarium#readme">github.com/radioactive-labs/angarium</a></li>
+      <li><span class="what">Gem</span><a href="https://rubygems.org/gems/angarium">rubygems.org/gems/angarium</a></li>
+      <li><span class="what">Spec</span><a href="https://www.standardwebhooks.com">standardwebhooks.com</a></li>
+    </ul>
+
+    <footer>MIT License · Radioactive Labs</footer>
+  </div>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var btn = document.getElementById("theme-toggle");
+      function effective() {
+        var t = root.getAttribute("data-theme");
+        if (t) return t;
+        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      function label() { btn.textContent = (effective() === "dark" ? "light" : "dark") + " mode"; }
+      btn.addEventListener("click", function () {
+        var next = effective() === "dark" ? "light" : "dark";
+        root.setAttribute("data-theme", next);
+        try { localStorage.setItem("angarium-theme", next); } catch (e) {}
+        label();
+      });
+      label();
+    })();
+  </script>
+</body>
+</html>

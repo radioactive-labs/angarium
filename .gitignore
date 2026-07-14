@@ -8,3 +8,5 @@
 gemfiles/*.gemfile.lock
 *.gem
 /gemfiles/vendor
+
+.DS_Store
