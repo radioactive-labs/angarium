@@ -779,7 +779,7 @@ migrations with `bin/rails g angarium:upgrade` (no flag needed): it reads
 for you, skipping ones you already have. If you installed Angarium before this
 generator existed, your existing migrations are named
 `<timestamp>_create_angarium_endpoints.angarium.rb` (Rails' native migration
-copy tagged them with the engine name) — they remain valid and are recognized
+copy tagged them with the engine name). They remain valid and are recognized
 as already installed, so `angarium:upgrade` won't recopy them.
 
 For custom roles or shards, set `config.connects_to` to a hash passed straight to
