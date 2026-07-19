@@ -774,8 +774,13 @@ end
 ```
 
 Then run `bin/rails db:migrate:angarium`. **After a gem upgrade**, pull in new
-migrations with `bin/rails g angarium:migrations` (no flag needed): it reads
-`config.database` and installs them into `db/angarium_migrate` for you.
+migrations with `bin/rails g angarium:upgrade` (no flag needed): it reads
+`config.database` and installs any missing migrations into `db/angarium_migrate`
+for you, skipping ones you already have. If you installed Angarium before this
+generator existed, your existing migrations are named
+`<timestamp>_create_angarium_endpoints.angarium.rb` (Rails' native migration
+copy tagged them with the engine name) — they remain valid and are recognized
+as already installed, so `angarium:upgrade` won't recopy them.
 
 For custom roles or shards, set `config.connects_to` to a hash passed straight to
 Rails' [`connects_to`](https://guides.rubyonrails.org/active_record_multiple_databases.html)
