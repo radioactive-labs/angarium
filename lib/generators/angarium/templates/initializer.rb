@@ -27,7 +27,7 @@ Angarium.configure do |config|
   # Multi-database: keep Angarium's tables in their own database. Set this to a
   # database name from config/database.yml and Angarium routes all its models and
   # migrations there. `bin/rails g angarium:install --database=NAME` sets this for
-  # you; after a gem upgrade, `bin/rails g angarium:migrations` reads it so new
+  # you; after a gem upgrade, `bin/rails g angarium:upgrade` reads it so new
   # migrations still land in db/NAME_migrate. nil (default) uses the primary connection.
   # config.database = :angarium
   #
