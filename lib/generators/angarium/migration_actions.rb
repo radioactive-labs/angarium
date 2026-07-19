@@ -63,8 +63,15 @@ module Angarium
       # Match both that legacy suffix and the plain form this generator writes,
       # so an app installed the old way isn't re-copied — which would attempt
       # to create the same tables twice and fail.
+      # Anchored to `<digits>_name.rb` / `<digits>_name.angarium.rb` exactly:
+      # a bare `*_name` glob lets `*` swallow underscores, so any migration
+      # merely ENDING in `_name.rb` (a host's own, or a sibling whose name
+      # extends this one) would count as installed and silently suppress the
+      # copy.
       def angarium_migration_exists?(name)
-        Dir.glob(File.join(destination_root, angarium_migrations_dir, "*_#{name}{,.angarium}.rb")).any?
+        pattern = /\A\d+_#{Regexp.escape(name)}(\.angarium)?\.rb\z/
+        Dir.glob(File.join(destination_root, angarium_migrations_dir, "*.rb"))
+          .any? { |file| File.basename(file).match?(pattern) }
       end
     end
   end

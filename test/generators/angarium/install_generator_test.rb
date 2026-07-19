@@ -20,6 +20,19 @@ class Angarium::InstallGeneratorTest < Rails::Generators::TestCase
       .map { |f| File.basename(f).sub(/\A\d+_/, "") }
   end
 
+  test "a migration whose name merely ends in a gem migration name does not suppress the copy" do
+    FileUtils.mkdir_p(File.join(destination_root, "db/migrate"))
+    File.write(File.join(destination_root, "db/migrate/20200101000000_my_create_angarium_endpoints.rb"), "# host decoy")
+    File.write(File.join(destination_root, "db/migrate/20200101000001_my_create_angarium_events.angarium.rb"), "# legacy-suffixed decoy")
+
+    run_generator
+
+    assert_includes migrations_in("db/migrate"), "create_angarium_endpoints.rb",
+      "a host migration ending in a gem migration's name must not count as installed"
+    assert_includes migrations_in("db/migrate"), "create_angarium_events.rb",
+      "a legacy-suffixed decoy ending in a gem migration's name must not count as installed"
+  end
+
   test "creates the initializer" do
     run_generator
     assert_file "config/initializers/angarium.rb", /Angarium.configure/
