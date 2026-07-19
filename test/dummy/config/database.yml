@@ -15,27 +15,36 @@ development:
 # Defaults to SQLite; the CI PostgreSQL/MySQL jobs set DB_ADAPTER to run the same
 # suite against a real server (native json + AR Encryption, non-UTF-8/NUL body
 # persistence, varchar length limits — none of which SQLite exercises faithfully).
+# `angarium` is the secondary database the multi-db boot checks (test/multi_db)
+# route Angarium's models to. Always in-memory SQLite — mixed adapters are fine
+# for connects_to — and excluded from db: tasks so db:test:prepare and
+# maintain_test_schema leave it alone; the boot checks migrate it themselves.
 test:
+  primary:
   <% if ENV["DB_ADAPTER"] == "postgresql" %>
-  adapter: postgresql
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  host: <%= ENV.fetch("PGHOST", "localhost") %>
-  port: <%= ENV.fetch("PGPORT", 5432) %>
-  username: <%= ENV.fetch("PGUSER", "postgres") %>
-  password: <%= ENV.fetch("PGPASSWORD", "postgres") %>
-  database: <%= ENV.fetch("PGDATABASE", "angarium_test") %>
+    adapter: postgresql
+    pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+    host: <%= ENV.fetch("PGHOST", "localhost") %>
+    port: <%= ENV.fetch("PGPORT", 5432) %>
+    username: <%= ENV.fetch("PGUSER", "postgres") %>
+    password: <%= ENV.fetch("PGPASSWORD", "postgres") %>
+    database: <%= ENV.fetch("PGDATABASE", "angarium_test") %>
   <% elsif ENV["DB_ADAPTER"] == "mysql" %>
-  adapter: trilogy
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  host: <%= ENV.fetch("MYSQL_HOST", "127.0.0.1") %>
-  port: <%= ENV.fetch("MYSQL_PORT", 3306) %>
-  username: <%= ENV.fetch("MYSQL_USER", "root") %>
-  password: <%= ENV.fetch("MYSQL_PASSWORD", "root") %>
-  database: <%= ENV.fetch("MYSQL_DATABASE", "angarium_test") %>
+    adapter: trilogy
+    pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+    host: <%= ENV.fetch("MYSQL_HOST", "127.0.0.1") %>
+    port: <%= ENV.fetch("MYSQL_PORT", 3306) %>
+    username: <%= ENV.fetch("MYSQL_USER", "root") %>
+    password: <%= ENV.fetch("MYSQL_PASSWORD", "root") %>
+    database: <%= ENV.fetch("MYSQL_DATABASE", "angarium_test") %>
   <% else %>
-  <<: *default
-  database: db/test.sqlite3
+    <<: *default
+    database: db/test.sqlite3
   <% end %>
+  angarium:
+    adapter: sqlite3
+    database: ":memory:"
+    database_tasks: false
 
 production:
   <<: *default

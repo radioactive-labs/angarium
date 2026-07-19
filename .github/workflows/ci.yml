@@ -38,6 +38,8 @@ jobs:
           bundler-cache: true
       - name: Run tests
         run: bin/rails test
+      - name: Run multi-db boot checks
+        run: bundle exec rake test:multi_db
 
   test-postgresql:
     name: PostgreSQL (Ruby 3.3 / Rails 8.1)

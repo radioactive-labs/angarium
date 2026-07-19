@@ -11,3 +11,20 @@ if Rails.env.development?
     end
   end
 end
+
+# Multi-db boot checks (test/multi_db) opt in via ENV. The connects_to wiring
+# in Angarium::ApplicationRecord runs once at class load — eager-loaded during
+# boot in CI — so the config has to be in place here, before boot finishes;
+# a test file can't set it later. Each check runs in its own process
+# (rake test:multi_db), so the two flags never coexist.
+if Rails.env.test?
+  if (db = ENV["ANGARIUM_TEST_DATABASE"])
+    Angarium.config.database = db.to_sym
+  end
+  if ENV["ANGARIUM_TEST_CONNECTS_TO"]
+    # database deliberately points at a config that doesn't exist: the check
+    # only passes if connects_to actually wins for the connection.
+    Angarium.config.database = :nonexistent_database_proving_connects_to_wins
+    Angarium.config.connects_to = {database: {writing: :angarium, reading: :angarium}}
+  end
+end
