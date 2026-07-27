@@ -1,0 +1,32 @@
+Description:
+    Installs Angarium: writes config/initializers/angarium.rb and copies its
+    migrations into db/migrate (or db/NAME_migrate for a multi-database setup).
+    Idempotent: migrations that already exist are skipped, so re-running is
+    safe.
+
+    Pass --database=NAME to run Angarium on its own database. This sets
+    config.database in the initializer and installs migrations into
+    db/NAME_migrate instead of db/migrate, so a later `angarium:upgrade` run
+    (e.g. after a gem update) still targets the right place without repeating
+    the flag.
+
+    Re-running this generator with a different --database than last time
+    changes config/initializers/angarium.rb's contents, so Thor will prompt
+    to overwrite it. Pass --force to skip the prompt in scripts/CI.
+
+Example:
+    bin/rails generate angarium:install
+
+    This creates:
+        config/initializers/angarium.rb
+
+    and copies Angarium's migrations into db/migrate:
+        create_angarium_endpoints.rb
+        create_angarium_events.rb
+        create_angarium_deliveries.rb
+        create_angarium_delivery_attempts.rb
+
+    bin/rails generate angarium:install --database=angarium
+
+    This sets config.database = :angarium in the initializer and copies the
+    migrations into db/angarium_migrate instead.

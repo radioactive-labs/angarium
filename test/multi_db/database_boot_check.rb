@@ -9,6 +9,7 @@
 # into the main suite's process.
 ENV["ANGARIUM_TEST_DATABASE"] = "angarium"
 require_relative "../test_helper"
+require_relative "../../lib/generators/angarium/migration_actions"
 
 class DatabaseBootCheck < Minitest::Test
   MODELS = [
@@ -26,11 +27,11 @@ class DatabaseBootCheck < Minitest::Test
       "the in-memory secondary starts schemaless — a table here means the " \
       "models are actually talking to the primary database"
 
+    templates_dir = Angarium::Engine.root.join("lib/generators/angarium/templates")
     ActiveRecord::Migration.suppress_messages do
-      Dir[Angarium::Engine.root.join("db/angarium_migrate/*.rb").to_s].sort.each do |file|
-        require file
-        File.basename(file, ".rb").sub(/\A\d+_/, "").camelize.constantize
-          .new.exec_migration(conn, :up)
+      Angarium::Generators::MigrationActions::MIGRATIONS.each do |name|
+        require templates_dir.join("#{name}.rb").to_s
+        name.camelize.constantize.new.exec_migration(conn, :up)
       end
     end
 
